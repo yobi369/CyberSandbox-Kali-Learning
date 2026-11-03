@@ -25,7 +25,7 @@ export const scoreLabAssessment = (
     ? Math.round(assessment.criteria.reduce((sum, criterion) => sum + (matched.includes(criterion.id) ? criterion.weight : 0), 0) / maxScore * 100)
     : 0;
 
-  return { score, maxScore: 100, matchedCriteria: matched, missingCriteria: missing, submittedAt };
+  return { submission: submission.trim(), score, maxScore: 100, matchedCriteria: matched, missingCriteria: missing, submittedAt };
 };
 
 export const getAssessmentFeedback = (
