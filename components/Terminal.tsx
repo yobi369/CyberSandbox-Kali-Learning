@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { TerminalLine, Lab } from '../types';
+import { appendTerminalLine, MAX_TERMINAL_LINE_LENGTH } from '../services/terminalHistory';
 import { HELP_TEXT } from '../constants';
 import { Terminal as TerminalIcon } from 'lucide-react';
 
@@ -24,10 +25,12 @@ const Terminal: React.FC<TerminalProps> = ({
   }, [history]);
 
   const addLine = (type: TerminalLine['type'], content: string) => {
-    setHistory((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), type, content, timestamp: Date.now() },
-    ]);
+    setHistory((prev) => appendTerminalLine(prev, {
+      id: crypto.randomUUID(),
+      type,
+      content,
+      timestamp: Date.now(),
+    }));
   };
 
   const handleCommand = (cmd: string) => {
