@@ -35,7 +35,18 @@ const App: React.FC = () => {
       if (!data || typeof data !== 'object') return;
       const state = data as Partial<SandboxPersistence>;
       if (Array.isArray(state.completedLabs)) setCompletedLabs(state.completedLabs.filter((id): id is string => typeof id === 'string'));
-      if (state.assessmentResults && typeof state.assessmentResults === 'object') setAssessmentResults(state.assessmentResults);
+      if (state.assessmentResults && typeof state.assessmentResults === 'object') {
+        const compatibleResults = Object.fromEntries(
+          Object.entries(state.assessmentResults).filter(([, result]) =>
+            Boolean(result && Array.isArray(result.feedback) && result.dimensionScores &&
+              typeof result.dimensionScores.evidence === 'number' &&
+              typeof result.dimensionScores.reasoning === 'number' &&
+              typeof result.dimensionScores.confidence === 'number' &&
+              typeof result.dimensionScores.remediation === 'number')
+          )
+        ) as Record<string, AssessmentResult>;
+        setAssessmentResults(compatibleResults);
+      }
       if (Array.isArray(state.terminalHistory)) setTerminalHistory(state.terminalHistory.filter((line): line is TerminalLine => Boolean(line && typeof line.id === 'string' && typeof line.content === 'string' && typeof line.timestamp === 'number')).slice(-MAX_TERMINAL_HISTORY_LINES).map((line) => ({ ...line, content: line.content.slice(0, MAX_TERMINAL_LINE_LENGTH) })));
       if (state.activeLab && Array.isArray(state.activeLab.steps)) {
         setActiveLab(state.activeLab);
