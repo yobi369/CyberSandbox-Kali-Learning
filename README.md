@@ -68,6 +68,7 @@ The GitHub Actions workflow runs typechecking, unit tests, and the production bu
 - `types.ts` — shared TypeScript contracts.
 - `docs/ARCHITECTURE.md` — current design and planned boundaries.
 - `docs/SECURITY.md` — threat model and security requirements.
+- `docs/ASSESSMENT.md` — assessment scale, evaluator limitations, benchmark strategy, and the required deep-learning standard for future labs.
 
 ## Roadmap
 
