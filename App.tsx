@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import Terminal from './components/Terminal';
 import Mentor from './components/Mentor';
 import LabBrowser from './components/LabBrowser';
-import { Lab, UserProgress, SandboxPersistence, TerminalLine } from './types';
+import AssessmentPanel from './components/AssessmentPanel';
+import { Lab, UserProgress, SandboxPersistence, TerminalLine, AssessmentResult } from './types';
 import { getMentorResponse, speakInstruction } from './services/geminiService';
 import { Shield, Activity, Network, Cpu, Radar } from 'lucide-react';
 import { INITIAL_FILES } from './constants';
@@ -16,6 +17,7 @@ const App: React.FC = () => {
   const [activeLab, setActiveLab] = useState<Lab | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [completedLabs, setCompletedLabs] = useState<string[]>([]);
+  const [assessmentResults, setAssessmentResults] = useState<Record<string, AssessmentResult>>({});
   const [mentorMessage, setMentorMessage] = useState('Welcome back. Your local training session is ready.');
   const [isMentorTyping, setIsMentorTyping] = useState(false);
   const [userProgress, setUserProgress] = useState<UserProgress>({ 
@@ -33,6 +35,7 @@ const App: React.FC = () => {
       if (!data || typeof data !== 'object') return;
       const state = data as Partial<SandboxPersistence>;
       if (Array.isArray(state.completedLabs)) setCompletedLabs(state.completedLabs.filter((id): id is string => typeof id === 'string'));
+      if (state.assessmentResults && typeof state.assessmentResults === 'object') setAssessmentResults(state.assessmentResults);
       if (Array.isArray(state.terminalHistory)) setTerminalHistory(state.terminalHistory.filter((line): line is TerminalLine => Boolean(line && typeof line.id === 'string' && typeof line.content === 'string' && typeof line.timestamp === 'number')).slice(-MAX_TERMINAL_HISTORY_LINES).map((line) => ({ ...line, content: line.content.slice(0, MAX_TERMINAL_LINE_LENGTH) })));
       if (state.activeLab && Array.isArray(state.activeLab.steps)) {
         setActiveLab(state.activeLab);
@@ -48,13 +51,13 @@ const App: React.FC = () => {
 
   useEffect(() => {
     try {
-      const persistence: SandboxPersistence = { activeLab, currentStepIndex, completedLabs, terminalHistory, fileSystem, userProgress, lastSaved: Date.now() };
+      const persistence: SandboxPersistence = { activeLab, currentStepIndex, completedLabs, assessmentResults, terminalHistory, fileSystem, userProgress, lastSaved: Date.now() };
       localStorage.setItem(PERSISTENCE_KEY, JSON.stringify(persistence));
       setIsSaved(true);
     } catch {
       setIsSaved(false);
     }
-  }, [activeLab, currentStepIndex, completedLabs, terminalHistory, fileSystem, userProgress]);
+  }, [activeLab, currentStepIndex, completedLabs, assessmentResults, terminalHistory, fileSystem, userProgress]);
 
   const handleSelectLab = async (lab: Lab) => {
     setActiveLab(lab);
@@ -83,6 +86,12 @@ const App: React.FC = () => {
         }
       }
     }
+  };
+
+  const handleAssessmentSubmit = (result: AssessmentResult) => {
+    if (!activeLab) return;
+    setAssessmentResults((previous) => ({ ...previous, [activeLab.id]: result }));
+    setMentorMessage(`Assessment scored ${result.score}%. Review the rubric feedback and revise your finding if needed.`);
   };
 
   const rankNames = ["Learner", "Junior Analyst", "Security Defender", "Researcher", "Specialist", "Senior Analyst", "Security Lead"];
@@ -165,6 +174,12 @@ const App: React.FC = () => {
                fileSystem={fileSystem}
                setFileSystem={setFileSystem}
              />
+             {activeLab && <AssessmentPanel
+               lab={activeLab}
+               completed={completedLabs.includes(activeLab.id)}
+               result={assessmentResults[activeLab.id]}
+               onSubmit={handleAssessmentSubmit}
+             />}
              <div className="mt-4 flex flex-wrap justify-between gap-2 text-[9px] font-black text-slate-600 uppercase tracking-widest px-1">
                 <div className="flex space-x-6">
                    <span className="flex items-center space-x-1"><div className="w-1 h-1 bg-cyan-500 rounded-full"></div> <span>Simulator: Active</span></span>
