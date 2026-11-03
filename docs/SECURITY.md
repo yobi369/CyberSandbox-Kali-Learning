@@ -20,7 +20,7 @@ This document describes the current browser-only simulator. It is not a certific
 | API key exposed in browser bundle | Browser-side Gemini SDK removed | Secure backend integration is not implemented |
 | Corrupt local progress crashes app | Parse errors handled; basic shape checks | Validation is intentionally lightweight |
 | Learner tampers with XP/completion | Progress is local only | No server-side authority or integrity |
-| Resource exhaustion from huge history | Not yet bounded | Add history and storage quotas |
+| Resource exhaustion from huge history | Terminal history is capped at 500 lines and 4,000 characters per line | Broader local-storage validation and quota handling remain limited |
 | Unsafe real-world target scanning | No network execution exists | Any future real-lab mode needs isolation and authorization |
 
 ## Mandatory requirements before real execution
