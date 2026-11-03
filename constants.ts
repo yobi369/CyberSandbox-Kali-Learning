@@ -41,7 +41,7 @@ export const LABS: Lab[] = [
       { id: '22', instruction: 'Scan for SSL/TLS vulnerabilities on port 443.', hint: 'nmap --script ssl-enum-ciphers -p 443 10.5.0.1', expectedCommand: 'nmap --script ssl-enum-ciphers -p 443 10.5.0.1', explanation: 'Identify weak encryption protocols.' },
       { id: '23', instruction: 'Check for SMB shares if port 445 is open.', hint: 'nmap --script smb-enum-shares -p 445 10.5.0.1', expectedCommand: 'nmap --script smb-enum-shares -p 445 10.5.0.1', explanation: 'Open shares can contain sensitive documents.' },
       { id: '24', instruction: 'Finalize the reconnaissance report by listing all findings.', hint: 'echo "Reporting..."', expectedCommand: 'echo', explanation: 'Consolidate all findings for the exploitation phase.' },
-      { id: '25', instruction: 'Complete the local practice report step.', hint: 'echo "Report complete"', expectedCommand: 'echo Report complete', explanation: 'This completes the simulated exercise workflow; it is not proof of access to a remote target.' }
+      { id: '25', instruction: 'Complete the local practice report step.', hint: 'echo Report complete', expectedCommand: 'echo Report complete', explanation: 'This completes the simulated exercise workflow; it is not proof of access to a remote target.' }
     ]
   },
   {
