@@ -15,7 +15,7 @@ const App: React.FC = () => {
   const [activeLab, setActiveLab] = useState<Lab | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [completedLabs, setCompletedLabs] = useState<string[]>([]);
-  const [mentorMessage, setMentorMessage] = useState('Welcome back, Operative. Re-establishing secure link...');
+  const [mentorMessage, setMentorMessage] = useState('Welcome back. Your local training session is ready.');
   const [isMentorTyping, setIsMentorTyping] = useState(false);
   const [userProgress, setUserProgress] = useState<UserProgress>({ 
     xp: 0, level: 1, rank: 'Green-Hat', skills: { recon: 10, web: 5, exploit: 0, forensics: 0 } 
@@ -58,7 +58,7 @@ const App: React.FC = () => {
   const handleSelectLab = async (lab: Lab) => {
     setActiveLab(lab);
     setCurrentStepIndex(0);
-    setMentorMessage(`Operation ${lab.title} initialized. Engaging tactical protocols.`);
+    setMentorMessage(`Lab ${lab.title} loaded. Work through the guided objectives.`);
     speakInstruction(`Operation ${lab.title} initialized. Objective: complete the authorized training exercise.`);
   };
 
@@ -76,7 +76,7 @@ const App: React.FC = () => {
         } else {
           setCompletedLabs(prev => [...prev, activeLab.id]);
           setUserProgress(prev => ({ ...prev, level: prev.level + 1 }));
-          setMentorMessage("Chain Complete. System neutralised.");
+          setMentorMessage("Lab completed. Review the evidence and key takeaways.");
         }
       }
     }
