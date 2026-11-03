@@ -1,0 +1,70 @@
+# CyberSandbox — Kali Learning Simulator
+
+CyberSandbox is a browser-based learning environment for practising cybersecurity concepts through guided, deliberately simulated terminal exercises. It is designed for learners who want to understand reconnaissance, service discovery, web security, authentication controls, and defensive interpretation without pointing tools at real systems.
+
+> **Important:** CyberSandbox is currently a front-end simulator, not a Kali Linux virtual machine. It does not execute shell commands, launch Kali tools, send network packets, brute-force credentials, exploit hosts, or provide an isolated operating-system container. Terminal results are seeded educational examples.
+
+## What exists today
+
+- React + TypeScript single-page learning interface.
+- Guided lab curriculum with difficulty labels and step progression.
+- Simulated command prompt with a small, explicitly documented command set.
+- Local browser progress persistence.
+- Browser-native text-to-speech where supported.
+- Curated practice scenario loading.
+- Responsive terminal and mentor panels.
+
+## Safety boundaries
+
+- All targets and outputs are fictional training data.
+- No command is passed to the host operating system or a shell.
+- Network, password-guessing, exploit, and web-scanning commands are never executed.
+- The Hydra practice command deliberately withholds credentials and redirects learners to defensive controls.
+- AI provider calls are disabled in the browser. Do not add API keys to Vite client environment variables or commit secrets.
+- Do not use this simulator to assess systems without explicit authorization.
+
+## Run locally
+
+Requirements: Node.js 20+ and npm.
+
+```bash
+npm install
+npm run dev
+```
+
+Open the local URL printed by Vite.
+
+## Validation
+
+```bash
+npm run typecheck
+npm run build
+```
+
+The GitHub Actions workflow runs these checks for pushes and pull requests.
+
+## Project structure
+
+- `App.tsx` — application shell, lab state, progress and persistence.
+- `components/Terminal.tsx` — deterministic simulated command interpreter.
+- `components/LabBrowser.tsx` — curriculum and practice scenario selection.
+- `components/Mentor.tsx` — objective, hints and learning feedback.
+- `constants.ts` — curated lab definitions and sample filesystem.
+- `services/geminiService.ts` — safe local mentor/scenario fallback; remote AI is intentionally disabled.
+- `types.ts` — shared TypeScript contracts.
+- `docs/ARCHITECTURE.md` — current design and planned boundaries.
+- `docs/SECURITY.md` — threat model and security requirements.
+
+## Roadmap
+
+1. Stabilize the simulator, state model, accessibility, and test coverage.
+2. Add structured lab authoring and evidence-based step validation.
+3. Add optional authenticated server-side AI assistance with quotas and output validation.
+4. Add real isolated lab execution only through disposable, network-restricted containers or VMs with explicit per-lab authorization.
+5. Add learner accounts, server-side progress, instructor controls, and operational monitoring.
+
+Items on the roadmap are not implemented unless explicitly described above.
+
+## License
+
+No license has been selected yet. Until a license is added, the repository's contents remain subject to the default copyright rules. Do not assume the project is open source for reuse.
