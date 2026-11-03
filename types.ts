@@ -18,9 +18,22 @@ export interface LabStep {
   id: string;
   instruction: string;
   hint: string;
-  expectedCommand?: string; 
+  expectedCommand?: string;
   explanation: string;
   detailedGuide?: string;
+}
+
+export interface AssessmentCriterion {
+  id: string;
+  label: string;
+  keywords: string[];
+  weight: number;
+  guidance: string;
+}
+
+export interface LabAssessment {
+  prompt: string;
+  criteria: AssessmentCriterion[];
 }
 
 export interface Lab {
@@ -32,8 +45,17 @@ export interface Lab {
   objectives: string[];
   hints: string[];
   targetIp: string;
-  dynamicTarget?: any; // Detailed machine info
+  dynamicTarget?: any;
   steps: LabStep[];
+  assessment?: LabAssessment;
+}
+
+export interface AssessmentResult {
+  score: number;
+  maxScore: number;
+  matchedCriteria: string[];
+  missingCriteria: string[];
+  submittedAt: number;
 }
 
 export interface UserProgress {
@@ -52,6 +74,7 @@ export interface SandboxPersistence {
   activeLab: Lab | null;
   currentStepIndex: number;
   completedLabs: string[];
+  assessmentResults?: Record<string, AssessmentResult>;
   terminalHistory: TerminalLine[];
   fileSystem: Record<string, string>;
   userProgress: UserProgress;
