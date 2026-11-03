@@ -51,16 +51,7 @@ const AssessmentPanel: React.FC<AssessmentPanelProps> = ({ lab, completed, resul
       <div className="space-y-2">
         <label htmlFor={`assessment-${lab.id}`} className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">Your technical finding</label>
         <p className="text-[10px] leading-relaxed text-slate-500">Use a short report structure: observation and source → technical interpretation → confidence and limitations → recommended action and verification. Do not invent facts that are absent from the sample output.</p>
-        <textarea id={`assessment-${lab.id}`} value={submission} onChange={(event) => setSubmission(event.target.value.slice(0, 2400))} minLength={80} maxLength={2400} rows={7} placeholder="Observation: What exact output did you see, and where?\n\nAnalysis: Why might it matter? What conditions would make the risk real?\n\nConfidence: What does this simulated evidence not prove?\n\nRecommendation: What should a defender do, and how should the change be verified?"} className="w-full resize-y rounded-xl border border-white/10 bg-slate-900 p-3 text-xs leading-relaxed text-slate-200 outline-none focus:border-violet-400/60" />
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-[9px] text-slate-500">{submission.length}/2400 characters · minimum 80 · four-dimension rubric</span>
-          <button type="button" onClick={submit} disabled={!completed || submission.trim().length < 80} className="rounded-lg bg-violet-500 px-4 py-2 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-40">{result ? "Rescore finding" : "Submit finding"}</button>
-        </div>
-      </div>
-
-      {!completed && <p className="text-[10px] text-amber-300">Complete the guided lab first. Assessment is a separate learning outcome and does not award command XP.</p>}
-
-      {result && <div aria-live="polite" className="space-y-3 rounded-xl border border-white/10 bg-slate-900/70 p-3">
+        <textarea id={`assessment-${lab.id}`} value={submission} onChange={(event) => setSubmission(event.target.value.slice(0, 2400))} minLength={80} maxLength={2400} rows={7} placeholder="Observation: exact output and source. Analysis: why it matters and required conditions. Confidence: what the simulated evidence does not prove. Recommendation: defensive action and verification." className="space-y-3 rounded-xl border border-white/10 bg-slate-900/70 p-3">
         <div className="flex items-center justify-between gap-3"><span className="text-[10px] font-black uppercase tracking-widest text-slate-200">Detailed rubric feedback</span><button type="button" onClick={() => setSubmission("")} className="flex items-center gap-1 text-[9px] text-slate-400 hover:text-white"><RotateCcw size={11}/> Clear draft</button></div>
         {result.feedback.map((item) => {
           const criterion = assessment.criteria.find((entry) => entry.id === item.criterionId);
