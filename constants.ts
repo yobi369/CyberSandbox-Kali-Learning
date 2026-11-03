@@ -110,6 +110,7 @@ export const INITIAL_FILES = {
   'home/kali': {
     'notes.txt': 'Phase 1: Recon on 10.5.0.1. Phase 2: Web exploitation on 10.10.10.5.',
     'usernames.txt': 'admin\nuser\njdoe\nroot',
-    'wordlist.txt': 'password\nadmin123\nqwerty',\n    'robots.txt': 'User-agent: *\nDisallow: /admin/'
+    'wordlist.txt': 'password\nadmin123\nqwerty',
+    'robots.txt': 'User-agent: *\nDisallow: /admin/'
   }
 };
