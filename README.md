@@ -12,7 +12,8 @@ CyberSandbox is a browser-based learning environment for practising cybersecurit
 - Local browser progress persistence.
 - Browser-native text-to-speech where supported.
 - Curated practice scenario loading.
-- Responsive terminal and mentor panels.
+- Responsive workspace that prioritizes the terminal on narrow screens.
+- Bounded local terminal history and command input.
 
 ## Safety boundaries
 
@@ -54,7 +55,8 @@ The GitHub Actions workflow runs typechecking, unit tests, and the production bu
 - `components/Mentor.tsx` — objective, hints and learning feedback.
 - `constants.ts` — curated lab definitions and sample filesystem.
 - `services/geminiService.ts` — safe local mentor/scenario fallback; remote AI is intentionally disabled.
-- `services/labProgress.ts` — token-safe expected-command matching for guided steps.
+- `services/labProgress.ts` — token-safe expected-command matching and one-time completion rewards.
+- `services/terminalHistory.ts` — bounded terminal history for local storage and rendering.
 - `*.test.ts` — unit tests for command matching and curriculum integrity.
 - `types.ts` — shared TypeScript contracts.
 - `docs/ARCHITECTURE.md` — current design and planned boundaries.
