@@ -11,7 +11,9 @@ CyberSandbox is a browser-based learning environment for practising cybersecurit
 - Simulated command prompt with a small, explicitly documented command set.
 - Local browser progress persistence, including assessment submissions and scores.
 - Evidence-based lab assessments with per-lab weighted rubrics, criterion-level feedback, and scores kept separate from command completion and XP.
-- Deterministic local scoring (keyword/rubric matching); it is formative feedback, not expert validation or proof that sample findings are true.
+- Transparent local heuristic assessment across four dimensions: evidence quality, technical reasoning, confidence/limitations, and remediation quality. Each dimension returns a 0–4 criterion level, weighted score, explanation, and next improvement.
+- Scenario-specific assessment rubrics and realistic benchmark tests for strong, weak, keyword-stuffed, overconfident, and unsafe findings.
+- Scores are formative signals only. The evaluator uses explicit textual indicators and structural heuristics; it is not a semantic expert, cannot verify claims, and must not be used for formal certification or hiring decisions.
 - Browser-native text-to-speech where supported.
 - Curated practice scenario loading.
 - Responsive workspace that prioritizes the terminal on narrow screens.
@@ -58,7 +60,8 @@ The GitHub Actions workflow runs typechecking, unit tests, and the production bu
 - `constants.ts` — curated lab definitions and sample filesystem.
 - `services/geminiService.ts` — safe local mentor/scenario fallback; remote AI is intentionally disabled.
 - `services/labProgress.ts` — token-safe expected-command matching and one-time completion rewards.
-- `services/labAssessment.ts` — deterministic weighted rubric scoring and criterion-level feedback.
+- `services/labAssessment.ts` — transparent four-dimension heuristic assessment, criterion-level scoring, and targeted feedback.
+- `services/labAssessment.test.ts` — realistic learner-submission benchmarks and adversarial scoring checks.
 - `components/AssessmentPanel.tsx` — evidence submission, rubric display, and assessment feedback.
 - `services/terminalHistory.ts` — bounded terminal history for local storage and rendering.
 - `*.test.ts` — unit tests for command matching and curriculum integrity.
@@ -69,7 +72,7 @@ The GitHub Actions workflow runs typechecking, unit tests, and the production bu
 ## Roadmap
 
 1. Stabilize the simulator, state model, accessibility, and test coverage.
-2. Expand assessment authoring, validate scoring quality with educator-reviewed examples, and add instructor review before treating scores as formal grades.
+2. Continue validating the heuristic against educator-labelled examples, add blind/manual moderation, and only introduce semantic AI grading behind a server-side, auditable, privacy-reviewed service. Never treat the current score as a formal grade.
 3. Add optional authenticated server-side AI assistance with quotas and output validation.
 4. Add real isolated lab execution only through disposable, network-restricted containers or VMs with explicit per-lab authorization.
 5. Add learner accounts, server-side progress, instructor controls, and operational monitoring.
