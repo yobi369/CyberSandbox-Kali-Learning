@@ -1,7 +1,7 @@
 import type { AssessmentCriterion, LabAssessment, AssessmentResult } from "../types";
 
 const normalize = (value: string): string =>
-  value.toLowerCase().replace(/[^a-z0-9.+/#-]+/g, " ").trim().replace(/\\s+/g, " ");
+  value.toLowerCase().replace(/[^a-z0-9.+/#-]+/g, " ").trim().replace(/\s+/g, " ");
 
 export const scoreLabAssessment = (
   assessment: LabAssessment,
