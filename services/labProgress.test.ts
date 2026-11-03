@@ -31,3 +31,19 @@ describe("matchesExpectedCommand", () => {
     expect(matchesExpectedCommand("nmap", undefined)).toBe(false);
   });
 });
+
+import { isFirstLabCompletion } from "./labProgress";
+
+describe("isFirstLabCompletion", () => {
+  it("allows a first completion", () => {
+    expect(isFirstLabCompletion("linux-foundations", [])).toBe(true);
+  });
+
+  it("does not award a duplicate completion", () => {
+    expect(isFirstLabCompletion("linux-foundations", ["linux-foundations"])).toBe(false);
+  });
+
+  it("does not confuse distinct labs", () => {
+    expect(isFirstLabCompletion("defensive-web-observation", ["linux-foundations"])).toBe(true);
+  });
+});
