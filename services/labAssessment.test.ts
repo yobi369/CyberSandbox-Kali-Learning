@@ -17,6 +17,7 @@ describe("scoreLabAssessment", () => {
     expect(result.score).toBe(100);
     expect(result.matchedCriteria).toHaveLength(3);
     expect(result.submittedAt).toBe(123);
+    expect(result.submission).toContain("Apache 2.4.41");
   });
 
   it("awards partial marks and identifies missing criteria", () => {
