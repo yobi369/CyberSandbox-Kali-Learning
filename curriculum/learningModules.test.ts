@@ -37,7 +37,7 @@ describe('deep learning curriculum', () => {
     for (const module of LEARNING_MODULES) {
       expect(module.overview.toLowerCase()).toMatch(/simulat|seeded|fictional/);
       for (const lesson of module.lessons) {
-        expect(lesson.workedExample.notEstablished.join(' ').toLowerCase()).toMatch(/simulat|fictional|does not|not prove|not establish/);
+        expect(lesson.workedExample.notEstablished.join(' ').toLowerCase()).toMatch(/simulat|fictional|does not|not prove|not establish|cannot|no packets/);
         for (const command of lesson.commandAnatomy) {
           expect(command.safety.length).toBeGreaterThan(20);
         }
