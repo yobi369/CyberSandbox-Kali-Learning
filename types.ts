@@ -51,6 +51,7 @@ export interface Lab {
 }
 
 export interface AssessmentResult {
+  submission: string;
   score: number;
   maxScore: number;
   matchedCriteria: string[];
