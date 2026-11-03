@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { CheckCircle2, ClipboardCheck, RotateCcw } from "lucide-react";
 import type { AssessmentResult, Lab } from "../types";
 import { getAssessmentFeedback, scoreLabAssessment } from "../services/labAssessment";
@@ -13,6 +13,7 @@ interface AssessmentPanelProps {
 const AssessmentPanel: React.FC<AssessmentPanelProps> = ({ lab, completed, result, onSubmit }) => {
   const assessment = lab.assessment;
   const [submission, setSubmission] = useState("");
+  useEffect(() => { setSubmission(result?.submission ?? ""); }, [result?.submission]);
   if (!assessment) return null;
 
   const feedback = result ? getAssessmentFeedback(assessment, result) : [];
@@ -45,7 +46,7 @@ const AssessmentPanel: React.FC<AssessmentPanelProps> = ({ lab, completed, resul
       <textarea id={`assessment-${lab.id}`} value={submission} onChange={(event) => setSubmission(event.target.value.slice(0, 1200))} minLength={30} maxLength={1200} rows={4} placeholder="State what the sample evidence shows, why it matters, how confident you are, and what defensive action you recommend..." className="w-full resize-y rounded-xl border border-white/10 bg-slate-900 p-3 text-xs leading-relaxed text-slate-200 outline-none focus:border-violet-400/60" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-[9px] text-slate-500">{submission.length}/1200 characters · minimum 30 · deterministic keyword rubric</span>
-        <button type="button" onClick={submit} disabled={!completed || submission.trim().length < 30} className="rounded-lg bg-violet-500 px-4 py-2 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-40">Score finding</button>
+        <button type="button" onClick={submit} disabled={!completed || submission.trim().length < 30} className="rounded-lg bg-violet-500 px-4 py-2 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-40">{result ? "Rescore finding" : "Score finding"}</button>
       </div>
       {!completed && <p className="text-[10px] text-amber-300">Complete the guided command steps to unlock assessment submission. This score is separate from command completion and XP.</p>}
       {result && <div aria-live="polite" className="rounded-xl border border-white/10 bg-slate-900/70 p-3 space-y-2">
