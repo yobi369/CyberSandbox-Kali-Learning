@@ -10,6 +10,10 @@ describe("matchesExpectedCommand", () => {
     expect(matchesExpectedCommand("nmapx 10.5.0.1", "nmap")).toBe(false);
   });
 
+  it("does not treat a command name appearing as an argument as execution", () => {
+    expect(matchesExpectedCommand("echo nmap", "nmap")).toBe(false);
+  });
+
   it("matches an expected multi-token command at the beginning", () => {
     expect(matchesExpectedCommand("nmap 10.5.0.1 -sV", "nmap 10.5.0.1")).toBe(true);
   });
