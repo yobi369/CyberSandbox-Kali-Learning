@@ -9,7 +9,9 @@ CyberSandbox is a browser-based learning environment for practising cybersecurit
 - React + TypeScript single-page learning interface.
 - Three curated guided labs spanning beginner Linux foundations, intermediate reconnaissance, and advanced defensive web-surface review.
 - Simulated command prompt with a small, explicitly documented command set.
-- Local browser progress persistence.
+- Local browser progress persistence, including assessment submissions and scores.
+- Evidence-based lab assessments with per-lab weighted rubrics, criterion-level feedback, and scores kept separate from command completion and XP.
+- Deterministic local scoring (keyword/rubric matching); it is formative feedback, not expert validation or proof that sample findings are true.
 - Browser-native text-to-speech where supported.
 - Curated practice scenario loading.
 - Responsive workspace that prioritizes the terminal on narrow screens.
@@ -56,6 +58,8 @@ The GitHub Actions workflow runs typechecking, unit tests, and the production bu
 - `constants.ts` — curated lab definitions and sample filesystem.
 - `services/geminiService.ts` — safe local mentor/scenario fallback; remote AI is intentionally disabled.
 - `services/labProgress.ts` — token-safe expected-command matching and one-time completion rewards.
+- `services/labAssessment.ts` — deterministic weighted rubric scoring and criterion-level feedback.
+- `components/AssessmentPanel.tsx` — evidence submission, rubric display, and assessment feedback.
 - `services/terminalHistory.ts` — bounded terminal history for local storage and rendering.
 - `*.test.ts` — unit tests for command matching and curriculum integrity.
 - `types.ts` — shared TypeScript contracts.
@@ -65,7 +69,7 @@ The GitHub Actions workflow runs typechecking, unit tests, and the production bu
 ## Roadmap
 
 1. Stabilize the simulator, state model, accessibility, and test coverage.
-2. Add structured lab authoring and evidence-based step validation.
+2. Expand assessment authoring, validate scoring quality with educator-reviewed examples, and add instructor review before treating scores as formal grades.
 3. Add optional authenticated server-side AI assistance with quotas and output validation.
 4. Add real isolated lab execution only through disposable, network-restricted containers or VMs with explicit per-lab authorization.
 5. Add learner accounts, server-side progress, instructor controls, and operational monitoring.
