@@ -44,6 +44,39 @@ export const LABS: Lab[] = [
       { id: '25', instruction: 'Submit the flag found in the target files.', hint: 'cat flag.txt (on target)', expectedCommand: 'cat flag.txt', explanation: 'The final proof of access.' }
     ]
   }
+  {
+    id: 'linux-foundations',
+    title: 'Linux Command-Line Foundations',
+    difficulty: 'Beginner',
+    category: 'Basics',
+    description: 'Learn to orient yourself in a Linux training environment, inspect provided files, and perform a safe, simulated DNS lookup.',
+    objectives: ['Identify the current training user and directory.', 'Inspect the supplied training notes.', 'Explain what a DNS lookup reveals.'],
+    hints: ['Start by identifying your context.', 'Read the supplied notes before interpreting a target.'],
+    targetIp: '192.0.2.10',
+    steps: [
+      { id: '1', instruction: 'Identify the current training user.', hint: 'whoami', expectedCommand: 'whoami', explanation: 'The simulator reports a training identity only; it does not inspect the host operating system.' },
+      { id: '2', instruction: 'Print the current training directory.', hint: 'pwd', expectedCommand: 'pwd', explanation: 'A working directory helps you understand where relative file paths are resolved.' },
+      { id: '3', instruction: 'List the files provided for this exercise.', hint: 'ls', expectedCommand: 'ls', explanation: 'Inventory the training files before opening them.' },
+      { id: '4', instruction: 'Read the exercise notes.', hint: 'cat notes.txt', expectedCommand: 'cat notes.txt', explanation: 'The notes contain seeded exercise context, not live system information.' },
+      { id: '5', instruction: 'Request the example DNS record for lab.example.test.', hint: 'dig lab.example.test', expectedCommand: 'dig', explanation: 'DNS maps names to records. This simulator displays example data and sends no DNS request.' }
+    ]
+  },
+  {
+    id: 'defensive-web-observation',
+    title: 'Defensive Web Surface Review',
+    difficulty: 'Advanced',
+    category: 'Web',
+    description: 'Practice interpreting seeded web-assessment evidence and writing a defensible finding without sending requests to a real service.',
+    objectives: ['Distinguish example scanner output from verified evidence.', 'Identify why software version disclosure matters.', 'Write a concise, evidence-based defensive recommendation.'],
+    hints: ['A tool name does not make output real.', 'Separate an observation from an assumption and a recommendation.'],
+    targetIp: '198.51.100.20',
+    steps: [
+      { id: '1', instruction: 'Review the seeded service inventory for the documentation-range target.', hint: 'nmap -sV 198.51.100.20', expectedCommand: 'nmap', explanation: 'The console returns a fixed sample. No packets are sent and the address is reserved for documentation examples.' },
+      { id: '2', instruction: 'Load the sample web scanner exercise output.', hint: 'nikto -h http://demo.example.test', expectedCommand: 'nikto', explanation: 'The displayed output is fictional training evidence, not a live HTTP assessment.' },
+      { id: '3', instruction: 'Review the local sample vulnerability research prompt.', hint: 'searchsploit Apache 2.4.41', expectedCommand: 'searchsploit', explanation: 'The simulator does not query Exploit-DB. Validate versions and vendor advisories independently in real defensive work.' },
+      { id: '4', instruction: 'Summarize the evidence and a safe remediation recommendation.', hint: 'echo "Document evidence and remediation"', expectedCommand: 'echo', explanation: 'A useful finding distinguishes observed evidence, impact, confidence, and remediation.' }
+    ]
+  },
 ];
 
 export const HELP_TEXT = `
