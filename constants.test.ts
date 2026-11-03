@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LABS } from "./constants";
+import { matchesExpectedCommand } from "./services/labProgress";
 
 describe("curated curriculum", () => {
   it("covers every supported difficulty", () => {
@@ -21,6 +22,14 @@ describe("curated curriculum", () => {
       for (const step of lab.steps) {
         expect(step.expectedCommand?.trim()).toBeTruthy();
         expect(step.explanation.trim()).toBeTruthy();
+      }
+    }
+  });
+
+  it("accepts each step's documented command hint", () => {
+    for (const lab of LABS) {
+      for (const step of lab.steps) {
+        expect(matchesExpectedCommand(step.hint, step.expectedCommand)).toBe(true);
       }
     }
   });
