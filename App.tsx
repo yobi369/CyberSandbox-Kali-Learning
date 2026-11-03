@@ -8,6 +8,7 @@ import { getMentorResponse, speakInstruction } from './services/geminiService';
 import { Shield, Activity, Network, Cpu, Radar } from 'lucide-react';
 import { INITIAL_FILES } from './constants';
 import { isFirstLabCompletion, matchesExpectedCommand } from './services/labProgress';
+import { MAX_TERMINAL_HISTORY_LINES, MAX_TERMINAL_LINE_LENGTH } from './services/terminalHistory';
 
 const PERSISTENCE_KEY = 'cyber_sandbox_elite_v5';
 
@@ -32,7 +33,7 @@ const App: React.FC = () => {
       if (!data || typeof data !== 'object') return;
       const state = data as Partial<SandboxPersistence>;
       if (Array.isArray(state.completedLabs)) setCompletedLabs(state.completedLabs.filter((id): id is string => typeof id === 'string'));
-      if (Array.isArray(state.terminalHistory)) setTerminalHistory(state.terminalHistory.filter((line): line is TerminalLine => Boolean(line && typeof line.id === 'string' && typeof line.content === 'string' && typeof line.timestamp === 'number')));
+      if (Array.isArray(state.terminalHistory)) setTerminalHistory(state.terminalHistory.filter((line): line is TerminalLine => Boolean(line && typeof line.id === 'string' && typeof line.content === 'string' && typeof line.timestamp === 'number')).slice(-MAX_TERMINAL_HISTORY_LINES).map((line) => ({ ...line, content: line.content.slice(0, MAX_TERMINAL_LINE_LENGTH) })));
       if (state.activeLab && Array.isArray(state.activeLab.steps)) {
         setActiveLab(state.activeLab);
         setCurrentStepIndex(Math.max(0, Math.min(Number(state.currentStepIndex) || 0, state.activeLab.steps.length - 1)));
