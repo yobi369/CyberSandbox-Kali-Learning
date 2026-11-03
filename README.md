@@ -7,7 +7,7 @@ CyberSandbox is a browser-based learning environment for practising cybersecurit
 ## What exists today
 
 - React + TypeScript single-page learning interface.
-- Guided lab curriculum with difficulty labels and step progression.
+- Three curated guided labs spanning beginner Linux foundations, intermediate reconnaissance, and advanced defensive web-surface review.
 - Simulated command prompt with a small, explicitly documented command set.
 - Local browser progress persistence.
 - Browser-native text-to-speech where supported.
@@ -38,10 +38,13 @@ Open the local URL printed by Vite.
 
 ```bash
 npm run typecheck
+npm test
 npm run build
+# or run all three gates
+npm run check
 ```
 
-The GitHub Actions workflow runs these checks for pushes and pull requests.
+The GitHub Actions workflow runs typechecking, unit tests, and the production build for pushes and pull requests.
 
 ## Project structure
 
@@ -51,6 +54,8 @@ The GitHub Actions workflow runs these checks for pushes and pull requests.
 - `components/Mentor.tsx` — objective, hints and learning feedback.
 - `constants.ts` — curated lab definitions and sample filesystem.
 - `services/geminiService.ts` — safe local mentor/scenario fallback; remote AI is intentionally disabled.
+- `services/labProgress.ts` — token-safe expected-command matching for guided steps.
+- `*.test.ts` — unit tests for command matching and curriculum integrity.
 - `types.ts` — shared TypeScript contracts.
 - `docs/ARCHITECTURE.md` — current design and planned boundaries.
 - `docs/SECURITY.md` — threat model and security requirements.
