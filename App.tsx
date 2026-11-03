@@ -4,6 +4,8 @@ import Terminal from './components/Terminal';
 import Mentor from './components/Mentor';
 import LabBrowser from './components/LabBrowser';
 import AssessmentPanel from './components/AssessmentPanel';
+import LearningGuide from './components/LearningGuide';
+import { getLearningModule } from './curriculum/learningModules';
 import { Lab, UserProgress, SandboxPersistence, TerminalLine, AssessmentResult } from './types';
 import { getMentorResponse, speakInstruction } from './services/geminiService';
 import { Shield, Activity, Network, Cpu, Radar } from 'lucide-react';
@@ -191,6 +193,9 @@ const App: React.FC = () => {
                result={assessmentResults[activeLab.id]}
                onSubmit={handleAssessmentSubmit}
              />}
+             <div className="mt-4 max-h-[48vh] min-h-0 overflow-y-auto pr-1 custom-scrollbar">
+               <LearningGuide module={activeLab ? getLearningModule(activeLab.id) : undefined} />
+             </div>
              <div className="mt-4 flex flex-wrap justify-between gap-2 text-[9px] font-black text-slate-600 uppercase tracking-widest px-1">
                 <div className="flex space-x-6">
                    <span className="flex items-center space-x-1"><div className="w-1 h-1 bg-cyan-500 rounded-full"></div> <span>Simulator: Active</span></span>
