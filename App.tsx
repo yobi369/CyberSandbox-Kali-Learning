@@ -82,7 +82,7 @@ const App: React.FC = () => {
     }
   };
 
-  const rankNames = ["Green-Hat", "Script-Kiddie", "White-Hat", "Grey-Hat", "Black-Hat", "Ghost", "Root-Admin"];
+  const rankNames = ["Learner", "Junior Analyst", "Security Defender", "Researcher", "Specialist", "Senior Analyst", "Security Lead"];
   const currentRank = rankNames[Math.min(userProgress.level - 1, rankNames.length - 1)];
 
   return (
@@ -111,7 +111,7 @@ const App: React.FC = () => {
            <div className="flex items-center space-x-12">
               <div>
                  <h1 className="text-2xl font-black text-white italic tracking-tighter flex items-center">
-                    GHOST<span className="text-cyan-500 ml-1">KALI</span>
+                    CYBER<span className="text-cyan-500 ml-1">SANDBOX</span>
                  </h1>
                  <div className="flex items-center space-x-2 mt-1">
                     <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Operator: {currentRank}</span>
