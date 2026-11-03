@@ -7,7 +7,7 @@ import type {
 } from "../types";
 
 const normalize = (value: string): string =>
-  value.toLowerCase().replace(/[^a-z0-9.+/#:-]+/g, " ").trim().replace(/\\s+/g, " ");
+  value.toLowerCase().replace(/[^a-z0-9.+/#:-]+/g, " ").trim().replace(/\s+/g, " ");
 
 const hasAny = (text: string, terms: string[]): boolean =>
   terms.some((term) => normalize(term).length > 0 && text.includes(normalize(term)));
@@ -77,7 +77,7 @@ const scoreCriterion = (criterion: AssessmentCriterion, text: string, original: 
   if (weakSignal) level -= 1;
 
   if (dimension === "evidence") {
-    const concreteDetail = /\\b(port|tcp|udp)\\s*\\d{1,5}\\b|\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b|\\b(?:apache|openssh|nginx)\\s*[0-9]/i.test(original);
+    const concreteDetail = /\b(port|tcp|udp)\s*\d{1,5}\b|\b\d{1,3}(?:\.\d{1,3}){3}\b|\b(?:apache|openssh|nginx)\s*[0-9]/i.test(original);
     if (concreteDetail && coverage > 0) level += 1;
     if (original.length < 55) level = Math.min(level, 1);
   }
