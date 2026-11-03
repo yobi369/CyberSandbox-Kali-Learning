@@ -89,12 +89,12 @@ const App: React.FC = () => {
   const currentRank = rankNames[Math.min(userProgress.level - 1, rankNames.length - 1)];
 
   return (
-    <div className="flex h-screen bg-[#020617] text-slate-300 font-sans overflow-hidden selection:bg-cyan-500/30">
+    <div className="flex h-screen min-h-[600px] bg-[#020617] text-slate-300 font-sans overflow-hidden selection:bg-cyan-500/30">
       {/* ELITE HUD OVERLAY */}
       <div className="fixed inset-0 pointer-events-none z-[100] border-[1px] border-cyan-500/10 opacity-30 shadow-[inset_0_0_100px_rgba(6,182,212,0.1)]"></div>
       
       {/* TACTICAL SIDEBAR */}
-      <div className="w-20 bg-slate-950 border-r border-white/5 flex flex-col items-center py-8 space-y-12 z-20">
+      <div className="w-14 sm:w-20 shrink-0 bg-slate-950 border-r border-white/5 flex flex-col items-center py-6 sm:py-8 space-y-8 sm:space-y-12 z-20">
         <div className="group relative">
            <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center animate-pulse shadow-[0_0_15px_rgba(6,182,212,0.2)]">
               <Shield className="text-cyan-400" size={24} />
@@ -107,10 +107,10 @@ const App: React.FC = () => {
       </div>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-20 border-b border-white/5 flex items-center justify-between px-10 bg-slate-950/60 backdrop-blur-xl">
-           <div className="flex items-center space-x-12">
+        <header className="min-h-20 border-b border-white/5 flex items-center justify-between gap-3 px-3 sm:px-6 lg:px-10 bg-slate-950/60 backdrop-blur-xl">
+           <div className="flex min-w-0 items-center gap-3 sm:gap-6 lg:gap-12">
               <div>
-                 <h1 className="text-2xl font-black text-white italic tracking-tighter flex items-center">
+                 <h1 className="text-lg sm:text-2xl font-black text-white italic tracking-tighter flex items-center">
                     CYBER<span className="text-cyan-500 ml-1">SANDBOX</span>
                  </h1>
                  <div className="flex items-center space-x-2 mt-1">
@@ -119,7 +119,7 @@ const App: React.FC = () => {
                  </div>
               </div>
 
-              <div className="flex space-x-8">
+              <div className="hidden sm:flex space-x-4 lg:space-x-8">
                  <div className="text-center">
                     <div className="text-[9px] font-black text-slate-500 uppercase mb-1">XP_SYNC</div>
                     <div className="h-1.5 w-32 bg-slate-900 rounded-full overflow-hidden border border-white/5">
@@ -133,7 +133,7 @@ const App: React.FC = () => {
               </div>
            </div>
 
-           <div className="flex items-center space-x-8">
+           <div className="hidden md:flex items-center space-x-4 lg:space-x-8">
               <div className="flex items-center space-x-3">
                  <div className="text-right">
                     <div className="text-[9px] font-black text-slate-500 uppercase">Local Session</div>
@@ -165,7 +165,7 @@ const App: React.FC = () => {
                fileSystem={fileSystem}
                setFileSystem={setFileSystem}
              />
-             <div className="mt-4 flex justify-between text-[9px] font-black text-slate-600 uppercase tracking-widest px-1">
+             <div className="mt-4 flex flex-wrap justify-between gap-2 text-[9px] font-black text-slate-600 uppercase tracking-widest px-1">
                 <div className="flex space-x-6">
                    <span className="flex items-center space-x-1"><div className="w-1 h-1 bg-cyan-500 rounded-full"></div> <span>Simulator: Active</span></span>
                    <span>{isSaved ? "Progress: Saved locally" : "Progress: Storage unavailable"}</span>
