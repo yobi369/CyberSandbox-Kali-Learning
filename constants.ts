@@ -43,7 +43,7 @@ export const LABS: Lab[] = [
       { id: '24', instruction: 'Finalize the reconnaissance report by listing all findings.', hint: 'echo "Reporting..."', expectedCommand: 'echo', explanation: 'Consolidate all findings for the exploitation phase.' },
       { id: '25', instruction: 'Submit the flag found in the target files.', hint: 'cat flag.txt (on target)', expectedCommand: 'cat flag.txt', explanation: 'The final proof of access.' }
     ]
-  }
+  },
   {
     id: 'linux-foundations',
     title: 'Linux Command-Line Foundations',
