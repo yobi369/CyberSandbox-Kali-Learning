@@ -24,34 +24,53 @@ const App: React.FC = () => {
   const [isSaved, setIsSaved] = useState(true);
 
   useEffect(() => {
-    const saved = localStorage.getItem(PERSISTENCE_KEY);
-    if (saved) {
-      const data = JSON.parse(saved);
-      setActiveLab(data.activeLab);
-      setCurrentStepIndex(data.currentStepIndex);
-      setCompletedLabs(data.completedLabs);
-      setTerminalHistory(data.terminalHistory);
-      setFileSystem(data.fileSystem);
-      setUserProgress(data.userProgress);
+    try {
+      const saved = localStorage.getItem(PERSISTENCE_KEY);
+      if (!saved) return;
+      const data: unknown = JSON.parse(saved);
+      if (!data || typeof data !== 'object') return;
+      const state = data as Partial<SandboxPersistence>;
+      if (Array.isArray(state.completedLabs)) setCompletedLabs(state.completedLabs.filter((id): id is string => typeof id === 'string'));
+      if (Array.isArray(state.terminalHistory)) setTerminalHistory(state.terminalHistory.filter((line): line is TerminalLine => Boolean(line && typeof line.id === 'string' && typeof line.content === 'string' && typeof line.timestamp === 'number')));
+      if (state.activeLab && Array.isArray(state.activeLab.steps)) {
+        setActiveLab(state.activeLab);
+        setCurrentStepIndex(Math.max(0, Math.min(Number(state.currentStepIndex) || 0, state.activeLab.steps.length - 1)));
+      }
+      if (state.fileSystem && typeof state.fileSystem === 'object') setFileSystem(state.fileSystem);
+      if (state.userProgress && typeof state.userProgress.xp === 'number' && typeof state.userProgress.level === 'number') setUserProgress(state.userProgress);
+    } catch {
+      localStorage.removeItem(PERSISTENCE_KEY);
+      setMentorMessage('Saved practice data could not be read. A fresh local session has been started.');
     }
   }, []);
 
   useEffect(() => {
-    const persistence = { activeLab, currentStepIndex, completedLabs, terminalHistory, fileSystem, userProgress, lastSaved: Date.now() };
-    localStorage.setItem(PERSISTENCE_KEY, JSON.stringify(persistence));
+    try {
+      const persistence: SandboxPersistence = { activeLab, currentStepIndex, completedLabs, terminalHistory, fileSystem, userProgress, lastSaved: Date.now() };
+      localStorage.setItem(PERSISTENCE_KEY, JSON.stringify(persistence));
+      setIsSaved(true);
+    } catch {
+      setIsSaved(false);
+    }
   }, [activeLab, currentStepIndex, completedLabs, terminalHistory, fileSystem, userProgress]);
 
   const handleSelectLab = async (lab: Lab) => {
     setActiveLab(lab);
     setCurrentStepIndex(0);
     setMentorMessage(`Operation ${lab.title} initialized. Engaging tactical protocols.`);
-    speakInstruction(`Operation ${lab.title} initialized. Objective: Full system compromise.`);
+    speakInstruction(`Operation ${lab.title} initialized. Objective: complete the authorized training exercise.`);
   };
 
   const handleCommandResult = async (command: string, output: string) => {
     if (activeLab?.steps[currentStepIndex]) {
       const step = activeLab.steps[currentStepIndex];
-      if (step.expectedCommand && command.toLowerCase().includes(step.expectedCommand.toLowerCase())) {
+      const normalizedCommand = command.trim().toLowerCase();
+      const expected = step.expectedCommand?.trim().toLowerCase();
+      const commandTokens = normalizedCommand.split(/\\s+/);
+      const stepMatched = Boolean(expected && (expected.includes(' ')
+        ? normalizedCommand.startsWith(expected)
+        : commandTokens.includes(expected)));
+      if (stepMatched) {
         setUserProgress(prev => ({ ...prev, xp: prev.xp + 150 }));
         if (currentStepIndex < activeLab.steps.length - 1) {
           setCurrentStepIndex(prev => prev + 1);
@@ -121,13 +140,13 @@ const App: React.FC = () => {
            <div className="flex items-center space-x-8">
               <div className="flex items-center space-x-3">
                  <div className="text-right">
-                    <div className="text-[9px] font-black text-slate-500 uppercase">Comm_Link</div>
-                    <div className="text-xs font-mono text-emerald-500">ENCRYPTED</div>
+                    <div className="text-[9px] font-black text-slate-500 uppercase">Local Session</div>
+                    <div className="text-xs font-mono text-emerald-500">LOCAL ONLY</div>
                  </div>
                  <Cloud size={18} className="text-cyan-500"/>
               </div>
               <div className="px-6 py-2.5 bg-slate-900/40 rounded-xl border border-white/5 font-mono text-xs font-bold text-slate-400">
-                 INTERNAL_IP: 172.16.2.221
+                 ENVIRONMENT: SIMULATED
               </div>
            </div>
         </header>
@@ -152,8 +171,8 @@ const App: React.FC = () => {
              />
              <div className="mt-4 flex justify-between text-[9px] font-black text-slate-600 uppercase tracking-widest px-1">
                 <div className="flex space-x-6">
-                   <span className="flex items-center space-x-1"><div className="w-1 h-1 bg-cyan-500 rounded-full"></div> <span>Core_System: Active</span></span>
-                   <span>Buffer: Clean</span>
+                   <span className="flex items-center space-x-1"><div className="w-1 h-1 bg-cyan-500 rounded-full"></div> <span>Simulator: Active</span></span>
+                   <span>{isSaved ? "Progress: Saved locally" : "Progress: Storage unavailable"}</span>
                 </div>
                 <span>v5.0.0-PRO</span>
              </div>
