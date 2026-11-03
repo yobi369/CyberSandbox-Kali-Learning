@@ -5,7 +5,7 @@ import Mentor from './components/Mentor';
 import LabBrowser from './components/LabBrowser';
 import { Lab, UserProgress, SandboxPersistence, TerminalLine } from './types';
 import { getMentorResponse, speakInstruction } from './services/geminiService';
-import { Shield, Activity, Wifi, Mic, MicOff, Network, Zap, Award, Cloud, Box, Cpu, Target, Radar } from 'lucide-react';
+import { Shield, Activity, Network, Cpu, Radar } from 'lucide-react';
 import { INITIAL_FILES } from './constants';
 import { matchesExpectedCommand } from './services/labProgress';
 
