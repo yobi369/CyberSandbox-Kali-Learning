@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getAssessmentFeedback, scoreLabAssessment } from "./labAssessment";
 import type { LabAssessment } from "../types";
+import { LABS } from "../constants";
 
 const rubric: LabAssessment = {
   prompt: "Write a concise, evidence-based defensive finding.",
@@ -56,5 +57,31 @@ describe("scoreLabAssessment against realistic learner submissions", () => {
   it("returns zero for empty or unrelated submissions", () => {
     expect(scoreLabAssessment(rubric, "   ").score).toBe(0);
     expect(scoreLabAssessment(rubric, "Everything is secure.").score).toBe(0);
+  });
+});
+
+describe("scenario-specific rubric calibration", () => {
+  it("recognizes a careful Linux foundations report", () => {
+    const lab = LABS.find((item) => item.id === "linux-foundations");
+    if (!lab?.assessment) throw new Error("Linux assessment fixture missing");
+    const submission = "whoami returned the training user and pwd showed the working directory /home/kali; notes.txt was the local exercise file. DNS maps a domain name to records such as an IP address because clients need a destination before connecting. The displayed lab.example.test answer is simulated example data and no DNS request was sent, so I cannot confirm any live record. In an authorized environment I would query the approved resolver, record the result and TTL, and compare it with the expected zone data.";
+    const result = scoreLabAssessment(lab.assessment, submission);
+    expect(result.score).toBeGreaterThanOrEqual(85);
+    expect(result.dimensionScores.evidence).toBeGreaterThanOrEqual(75);
+    expect(result.dimensionScores.reasoning).toBeGreaterThanOrEqual(75);
+    expect(result.dimensionScores.confidence).toBeGreaterThanOrEqual(75);
+    expect(result.dimensionScores.remediation).toBeGreaterThanOrEqual(75);
+  });
+
+  it("recognizes a defensible defensive-web report", () => {
+    const lab = LABS.find((item) => item.id === "defensive-web-observation");
+    if (!lab?.assessment) throw new Error("Web assessment fixture missing");
+    const submission = "The supplied simulated scanner output observed an Apache 2.4.41 server header. This can support service fingerprinting because the version may help prioritize targeted research, but the header alone does not prove a vulnerability or compromise. The output is seeded and not live, so I cannot confirm the deployed version; an authorized review would verify the actual response and vendor patch status. Remediation is to apply supported updates, remove unnecessary version disclosure, and verify the response header after the change.";
+    const result = scoreLabAssessment(lab.assessment, submission);
+    expect(result.score).toBeGreaterThanOrEqual(85);
+    expect(result.dimensionScores.evidence).toBeGreaterThanOrEqual(75);
+    expect(result.dimensionScores.reasoning).toBeGreaterThanOrEqual(75);
+    expect(result.dimensionScores.confidence).toBeGreaterThanOrEqual(75);
+    expect(result.dimensionScores.remediation).toBeGreaterThanOrEqual(75);
   });
 });
