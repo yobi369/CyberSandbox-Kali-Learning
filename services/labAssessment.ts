@@ -29,7 +29,7 @@ const QUALITY_SIGNALS: Record<AssessmentDimension, { strong: string[]; weak: str
     weak: ["definitely exploitable", "guaranteed", "certainly compromised", "proves the server is hacked"],
   },
   remediation: {
-    strong: ["restrict access", "apply patches", "update the server", "disable unnecessary", "review firewall", "enable mfa", "monitor authentication", "remove the banner", "enforce access control", "verify configuration", "verify the result", "document the result", "query approved resolver"],
+    strong: ["restrict access", "apply patches", "update the server", "disable unnecessary", "review firewall", "enable mfa", "monitor authentication", "remove the banner", "remove the unnecessary version banner", "apply supported updates", "patch status", "enforce access control", "verify configuration", "verify the result", "document the result", "query approved resolver"],
     weak: ["hack back", "exploit it", "delete the server", "just secure it"],
   },
 };
@@ -71,6 +71,8 @@ const scoreCriterion = (criterion: AssessmentCriterion, text: string, original: 
   const dimension = criterion.dimension;
   const strongSignal = hasAny(text, QUALITY_SIGNALS[dimension].strong);
   const weakSignal = hasAny(text, QUALITY_SIGNALS[dimension].weak);
+  const sentences = original.split(/[.!?]+/).map((sentence) => normalize(sentence)).filter((sentence) => sentence.length > 0);
+  const repeatedSentence = sentences.length >= 2 && new Set(sentences).size < sentences.length;
 
   let level = Math.round(coverage * 3);
   if (strongSignal && coverage > 0) level += 1;
@@ -84,6 +86,7 @@ const scoreCriterion = (criterion: AssessmentCriterion, text: string, original: 
   if (dimension === "reasoning" && !strongSignal) level = Math.min(level, 2);
   if (dimension === "confidence" && weakSignal) level = Math.min(level, 1);
   if (dimension === "remediation" && !strongSignal) level = Math.min(level, 2);
+  if (repeatedSentence) level = Math.min(level, 1);
 
   level = Math.max(0, Math.min(4, level));
   const feedback = level >= 3
