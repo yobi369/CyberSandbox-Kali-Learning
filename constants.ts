@@ -4,15 +4,15 @@ import { Lab } from './types';
 export const LABS: Lab[] = [
   {
     id: 'deep-recon-full-chain',
-    title: 'Professional Reconnaissance Masterclass',
+    title: 'Simulated Reconnaissance Workflow',
     difficulty: 'Intermediate',
     category: 'Recon',
-    description: 'An exhaustive 25-step reconnaissance operation covering everything from initial DNS discovery to deep service banner analysis.',
+    description: 'A 25-step guided simulation for learning how reconnaissance evidence is collected, interpreted, and documented. All results are seeded examples.',
     objectives: [
-      'Map the external attack surface.',
+      'Build a structured inventory from the provided fictional target evidence.',
       'Enumerate all DNS records and subdomains.',
-      'Perform stealthy and aggressive port scanning.',
-      'Identify service versions and potential entry points.'
+      'Compare simulated scan profiles and explain their limitations.',
+      'Identify exposed services that warrant defensive review.'
     ],
     hints: ['Information is the most powerful weapon.', 'Start broad, end specific.'],
     targetIp: '10.5.0.1',
@@ -36,8 +36,8 @@ export const LABS: Lab[] = [
       { id: '17', instruction: 'Perform a directory brute force using gobuster.', hint: 'gobuster dir -u http://10.5.0.1 -w wordlist.txt', expectedCommand: 'gobuster', explanation: 'Discover hidden web directories like /admin or /config.' },
       { id: '18', instruction: 'Check for common web vulnerabilities with Nikto.', hint: 'nikto -h http://10.5.0.1', expectedCommand: 'nikto', explanation: 'Nikto identifies outdated plugins and common misconfigurations.' },
       { id: '19', instruction: 'Review the seeded robots.txt example.', hint: 'cat robots.txt', expectedCommand: 'cat robots.txt', explanation: 'Robots.txt can disclose paths that a site owner asks crawlers not to index; it is not an access-control mechanism.' },
-      { id: '20', instruction: 'Simulate a login probe with Hydra.', hint: 'hydra -l admin -P wordlist.txt 10.5.0.1 ssh', expectedCommand: 'hydra', explanation: 'Test for weak credentials on exposed services.' },
-      { id: '21', instruction: 'Analyze the TTL of the ping response to guess the OS.', hint: 'nmap 10.5.0.1 (check details)', expectedCommand: 'nmap', explanation: 'TTL 64 usually indicates Linux, 128 indicates Windows.' },
+      { id: '20', instruction: 'Review the blocked credential-guessing example and identify defensive controls.', hint: 'hydra -l admin -P wordlist.txt 10.5.0.1 ssh', expectedCommand: 'hydra', explanation: 'The simulator blocks credential guessing. In a defensive review, consider MFA, rate limits, lockout policy, and authentication telemetry.' },
+      { id: '21', instruction: 'Interpret the sample TTL value and note why it is only an OS clue.', hint: 'nmap 10.5.0.1 (check details)', expectedCommand: 'nmap', explanation: 'Initial TTL values vary by stack and can be changed or obscured; treat this as a weak clue, not reliable OS identification.' },
       { id: '22', instruction: 'Scan for SSL/TLS vulnerabilities on port 443.', hint: 'nmap --script ssl-enum-ciphers -p 443 10.5.0.1', expectedCommand: 'nmap --script ssl-enum-ciphers -p 443 10.5.0.1', explanation: 'Identify weak encryption protocols.' },
       { id: '23', instruction: 'Check for SMB shares if port 445 is open.', hint: 'nmap --script smb-enum-shares -p 445 10.5.0.1', expectedCommand: 'nmap --script smb-enum-shares -p 445 10.5.0.1', explanation: 'Open shares can contain sensitive documents.' },
       { id: '24', instruction: 'Finalize the reconnaissance report by listing all findings.', hint: 'echo "Reporting..."', expectedCommand: 'echo', explanation: 'Consolidate all findings for the exploitation phase.' },
