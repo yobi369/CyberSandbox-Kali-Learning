@@ -16,6 +16,15 @@ export const LABS: Lab[] = [
     ],
     hints: ['Information is the most powerful weapon.', 'Start broad, end specific.'],
     targetIp: '10.5.0.1',
+    assessment: {
+      prompt: 'Write a concise reconnaissance finding using the fictional exercise data. Separate observations from assumptions, explain defensive relevance, state confidence or limitations, and recommend a proportionate next step.',
+      criteria: [
+        { id: 'observation', label: 'Specific observations', keywords: ['open port', 'service version', 'dns record', 'subdomain', 'apache', 'ssh'], weight: 30, guidance: 'Name at least one specific observed port, service/version, DNS record, or discovered subdomain from the sample output.' },
+        { id: 'interpretation', label: 'Defensible interpretation', keywords: ['attack surface', 'exposure', 'misconfiguration', 'fingerprinting', 'enumeration'], weight: 25, guidance: 'Explain what the observation could mean for the exposed attack surface without claiming compromise.' },
+        { id: 'limitations', label: 'Evidence limitations', keywords: ['simulated', 'seeded', 'not verified', 'confidence', 'limitation'], weight: 20, guidance: 'State that the evidence is simulated/seeded and cannot verify a live host or vulnerability.' },
+        { id: 'recommendation', label: 'Defensive next step', keywords: ['patch', 'restrict', 'firewall', 'review', 'disable', 'monitor'], weight: 25, guidance: 'Recommend a concrete defensive review, such as patching, restricting unnecessary exposure, or monitoring.' }
+      ]
+    },
     steps: [
       { id: '1', instruction: 'Start with whoami to confirm your environment.', hint: 'whoami', expectedCommand: 'whoami', explanation: 'Verify your current shell permissions.' },
       { id: '2', instruction: 'Check your current directory for local intelligence.', hint: 'ls', expectedCommand: 'ls', explanation: 'Look for notes or wordlists provided for the mission.' },
@@ -53,6 +62,15 @@ export const LABS: Lab[] = [
     objectives: ['Identify the current training user and directory.', 'Inspect the supplied training notes.', 'Explain what a DNS lookup reveals.'],
     hints: ['Start by identifying your context.', 'Read the supplied notes before interpreting a target.'],
     targetIp: '192.0.2.10',
+    assessment: {
+      prompt: 'Summarize what the local training commands established. Explain the role of DNS, distinguish supplied sample data from live system evidence, and state one safe next step.',
+      criteria: [
+        { id: 'context', label: 'Environment context', keywords: ['training environment', 'training user', 'working directory', 'local files'], weight: 30, guidance: 'Describe the training identity, working directory, or supplied files you inspected.' },
+        { id: 'dns', label: 'DNS understanding', keywords: ['dns', 'domain name', 'ip address', 'record'], weight: 30, guidance: 'Explain that DNS maps domain names to records such as IP addresses.' },
+        { id: 'limitations', label: 'Simulation boundary', keywords: ['simulated', 'example data', 'no dns request', 'not live'], weight: 20, guidance: 'Clarify that the lookup displayed example data and did not query a live DNS resolver.' },
+        { id: 'next-step', label: 'Safe next step', keywords: ['document', 'verify', 'authorized', 'compare'], weight: 20, guidance: 'Suggest documenting the result or verifying it only in an explicitly authorized environment.' }
+      ]
+    },
     steps: [
       { id: '1', instruction: 'Identify the current training user.', hint: 'whoami', expectedCommand: 'whoami', explanation: 'The simulator reports a training identity only; it does not inspect the host operating system.' },
       { id: '2', instruction: 'Print the current training directory.', hint: 'pwd', expectedCommand: 'pwd', explanation: 'A working directory helps you understand where relative file paths are resolved.' },
@@ -70,6 +88,15 @@ export const LABS: Lab[] = [
     objectives: ['Distinguish example scanner output from verified evidence.', 'Identify why software version disclosure matters.', 'Write a concise, evidence-based defensive recommendation.'],
     hints: ['A tool name does not make output real.', 'Separate an observation from an assumption and a recommendation.'],
     targetIp: '198.51.100.20',
+    assessment: {
+      prompt: 'Write a defensive web-surface finding from the fictional scanner evidence. Include the observed technology or behavior, potential impact, confidence/limitations, and actionable remediation.',
+      criteria: [
+        { id: 'evidence', label: 'Observed evidence', keywords: ['apache', 'server header', 'version disclosure', 'robots.txt', 'http header'], weight: 30, guidance: 'Identify a concrete sample observation such as a server version, header, or robots.txt path.' },
+        { id: 'impact', label: 'Potential impact', keywords: ['fingerprinting', 'targeted attacks', 'attack surface', 'information disclosure'], weight: 25, guidance: 'Explain how the observation may assist fingerprinting or reveal information, without overstating exploitability.' },
+        { id: 'confidence', label: 'Confidence and limits', keywords: ['simulated', 'seeded', 'not verified', 'confidence', 'limitation'], weight: 20, guidance: 'State that scanner output is seeded and requires authorized independent verification.' },
+        { id: 'remediation', label: 'Remediation', keywords: ['minimize', 'patch', 'update', 'restrict', 'access control', 'review'], weight: 25, guidance: 'Recommend a proportionate action such as minimizing banners, patching, or enforcing access controls.' }
+      ]
+    },
     steps: [
       { id: '1', instruction: 'Review the seeded service inventory for the documentation-range target.', hint: 'nmap -sV 198.51.100.20', expectedCommand: 'nmap', explanation: 'The console returns a fixed sample. No packets are sent and the address is reserved for documentation examples.' },
       { id: '2', instruction: 'Load the sample web scanner exercise output.', hint: 'nikto -h http://demo.example.test', expectedCommand: 'nikto', explanation: 'The displayed output is fictional training evidence, not a live HTTP assessment.' },
