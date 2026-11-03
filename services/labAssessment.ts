@@ -29,7 +29,7 @@ const QUALITY_SIGNALS: Record<AssessmentDimension, { strong: string[]; weak: str
     weak: ["definitely exploitable", "guaranteed", "certainly compromised", "proves the server is hacked"],
   },
   remediation: {
-    strong: ["restrict access", "apply patches", "update the server", "disable unnecessary", "review firewall", "enable mfa", "monitor authentication", "remove the banner", "enforce access control", "verify configuration"],
+    strong: ["restrict access", "apply patches", "update the server", "disable unnecessary", "review firewall", "enable mfa", "monitor authentication", "remove the banner", "enforce access control", "verify configuration", "verify the result", "document the result", "query approved resolver"],
     weak: ["hack back", "exploit it", "delete the server", "just secure it"],
   },
 };
