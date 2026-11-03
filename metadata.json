@@ -1,0 +1,8 @@
+{
+  "name": "CyberSandbox: Kali Learning Lab",
+  "description": "A comprehensive web-based simulation of a Kali Linux environment for practicing cybersecurity skills including network scanning, password cracking, and web exploitation, guided by a Gemini-powered AI mentor.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": []
+}
