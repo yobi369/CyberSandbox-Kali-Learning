@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Typecheck and production build
+    name: Typecheck, tests and production build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
