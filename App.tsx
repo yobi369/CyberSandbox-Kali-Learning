@@ -98,10 +98,7 @@ const App: React.FC = () => {
            </div>
         </div>
         <nav className="flex-1 flex flex-col space-y-8">
-           <button className="p-3 text-cyan-500 bg-cyan-500/10 rounded-xl"><Radar size={22}/></button>
-           <button className="p-3 text-slate-600 hover:text-cyan-400"><Cpu size={22}/></button>
-           <button className="p-3 text-slate-600 hover:text-cyan-400"><Target size={22}/></button>
-           <button className="p-3 text-slate-600 hover:text-cyan-400"><Box size={22}/></button>
+           <div aria-label="Lab workspace" className="p-3 text-cyan-500 bg-cyan-500/10 rounded-xl"><Radar size={22}/></div>
         </nav>
         <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20"><Activity size={20}/></div>
       </div>
@@ -127,8 +124,8 @@ const App: React.FC = () => {
                     </div>
                  </div>
                  <div className="text-center">
-                    <div className="text-[9px] font-black text-slate-500 uppercase mb-1">Threat_Level</div>
-                    <div className="text-xs font-mono text-amber-500 font-black">LOW</div>
+                    <div className="text-[9px] font-black text-slate-500 uppercase mb-1">Session_Mode</div>
+                    <div className="text-xs font-mono text-emerald-500 font-black">TRAINING</div>
                  </div>
               </div>
            </div>
@@ -139,7 +136,7 @@ const App: React.FC = () => {
                     <div className="text-[9px] font-black text-slate-500 uppercase">Local Session</div>
                     <div className="text-xs font-mono text-emerald-500">LOCAL ONLY</div>
                  </div>
-                 <Cloud size={18} className="text-cyan-500"/>
+                 <Cpu size={18} className="text-cyan-500"/>
               </div>
               <div className="px-6 py-2.5 bg-slate-900/40 rounded-xl border border-white/5 font-mono text-xs font-bold text-slate-400">
                  ENVIRONMENT: SIMULATED
@@ -185,11 +182,11 @@ const App: React.FC = () => {
              <div className="bg-slate-950/60 border border-cyan-500/20 rounded-2xl p-6 flex flex-col relative overflow-hidden group h-64 shadow-2xl">
                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Network size={60}/></div>
                 <h3 className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] mb-6 flex items-center">
-                   <Radar size={14} className="mr-2 animate-spin-slow"/> Live_Scan_Map
+                   <Radar size={14} className="mr-2 "/> Seeded_Target
                 </h3>
                 <div className="flex-1 flex items-center justify-center relative">
                    <div className="w-32 h-32 rounded-full border border-cyan-500/20 flex items-center justify-center">
-                      <div className="w-24 h-24 rounded-full border border-cyan-500/40 flex items-center justify-center animate-ping"></div>
+                      <div className="w-24 h-24 rounded-full border border-cyan-500/40 flex items-center justify-center"></div>
                       <div className="absolute inset-0 flex items-center justify-center">
                          {activeLab ? (
                             <div className="text-center">
@@ -199,11 +196,12 @@ const App: React.FC = () => {
                                <span className="text-[10px] font-mono text-white font-black">{activeLab.targetIp}</span>
                             </div>
                          ) : (
-                            <span className="text-[9px] text-slate-600 font-black uppercase">Scanning...</span>
+                            <span className="text-[9px] text-slate-600 font-black uppercase">Select a lab</span>
                          )}
                       </div>
                    </div>
                 </div>
+                <p className="text-[9px] text-center text-slate-500 uppercase tracking-widest">Seeded exercise data · no network traffic</p>
              </div>
           </div>
         </main>
