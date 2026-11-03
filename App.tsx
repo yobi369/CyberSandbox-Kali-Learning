@@ -7,7 +7,7 @@ import { Lab, UserProgress, SandboxPersistence, TerminalLine } from './types';
 import { getMentorResponse, speakInstruction } from './services/geminiService';
 import { Shield, Activity, Network, Cpu, Radar } from 'lucide-react';
 import { INITIAL_FILES } from './constants';
-import { matchesExpectedCommand } from './services/labProgress';
+import { isFirstLabCompletion, matchesExpectedCommand } from './services/labProgress';
 
 const PERSISTENCE_KEY = 'cyber_sandbox_elite_v5';
 
@@ -74,9 +74,11 @@ const App: React.FC = () => {
           setMentorMessage(feedback);
           speakInstruction(activeLab.steps[currentStepIndex + 1]?.instruction || "Next step ready.");
         } else {
-          setCompletedLabs(prev => [...prev, activeLab.id]);
-          setUserProgress(prev => ({ ...prev, level: prev.level + 1 }));
-          setMentorMessage("Lab completed. Review the evidence and key takeaways.");
+          if (isFirstLabCompletion(activeLab.id, completedLabs)) {
+            setCompletedLabs(prev => prev.includes(activeLab.id) ? prev : [...prev, activeLab.id]);
+            setUserProgress(prev => ({ ...prev, level: prev.level + 1 }));
+          }
+          setMentorMessage("Lab completed. Review the evidence and key takeaways. You can replay it for practice.");
         }
       }
     }
