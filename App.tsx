@@ -148,7 +148,7 @@ const App: React.FC = () => {
         </header>
 
         <main className="flex-1 flex min-h-0 bg-[linear-gradient(rgba(6,182,212,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.02)_1px,transparent_1px)] bg-[size:40px_40px]">
-          <div className="w-80 border-r border-white/5 p-8 flex flex-col bg-slate-950/40 backdrop-blur-md">
+          <div className="hidden lg:flex w-80 shrink-0 border-r border-white/5 p-6 flex-col bg-slate-950/40 backdrop-blur-md">
              <LabBrowser 
                activeLabId={activeLab?.id || null} 
                onSelectLab={handleSelectLab} 
@@ -156,7 +156,7 @@ const App: React.FC = () => {
              />
           </div>
 
-          <div className="flex-1 p-8 flex flex-col min-w-0 relative">
+          <div className="flex-1 p-3 sm:p-4 lg:p-8 flex flex-col min-w-0 relative">
              <Terminal 
                activeLab={activeLab} 
                onCommandExecuted={handleCommandResult}
@@ -174,7 +174,7 @@ const App: React.FC = () => {
              </div>
           </div>
 
-          <div className="w-96 border-l border-white/5 p-8 flex flex-col bg-slate-950/40 backdrop-blur-md space-y-8">
+          <div className="hidden xl:flex w-96 shrink-0 border-l border-white/5 p-6 flex-col bg-slate-950/40 backdrop-blur-md space-y-8">
              <Mentor 
                message={mentorMessage} 
                isTyping={isMentorTyping} 
