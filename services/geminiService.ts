@@ -1,68 +1,43 @@
-
-import { GoogleGenAI, Modality } from "@google/genai";
 import { Lab } from "../types";
+import { LABS } from "../constants";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-
+/**
+ * AI integrations are intentionally disabled until a trusted server-side
+ * API proxy, authentication, rate limits, and abuse controls are implemented.
+ * This client-side fallback keeps the learning experience usable without
+ * exposing provider credentials in a browser bundle.
+ */
 export const generateMission = async (difficulty: string): Promise<Lab> => {
-  const minSteps = 25;
-  const complexity = difficulty === 'Advanced' ? 'chained exploits, internal pivoting, and log clearing' : 'deep service enumeration and vulnerability analysis';
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: `Generate a 25-step ELITE cybersecurity lab for a Kali Linux sandbox. 
-    Level: ${difficulty}. Theme: ${complexity}.
-    Must be a valid JSON object. 
-    Steps must be sequential and use real Kali tools: nmap, gobuster, hydra, nikto, msfconsole, searchsploit, etc.
-    Include 'detailedGuide' for every step explaining professional hacker methodology.`,
-    config: {
-      responseMimeType: "application/json",
-    }
-  });
-
-  return JSON.parse(response.text);
+  const requested = LABS.find((lab) => lab.difficulty === difficulty);
+  const selected = requested ?? LABS[0];
+  return {
+    ...selected,
+    id: `${selected.id}-practice-${Date.now()}`,
+    title: `${selected.title} — Practice Run`,
+    objectives: [...selected.objectives],
+    hints: [...selected.hints],
+    steps: selected.steps.map((step) => ({ ...step })),
+  };
 };
 
-export const getMentorResponse = async (userCommand: string, output: string, currentLab: Lab | null) => {
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `Action: ${userCommand}\nOutput: ${output}\nMission: ${currentLab?.title || 'Sandbox'}. Provide elite, short feedback.`,
-  });
-  return response.text;
-};
-
-export const speakInstruction = async (text: string) => {
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: `Say with a tactical, robotic, calm military voice: ${text}` }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } },
-        },
-      },
-    });
-
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (base64Audio) {
-      const audioData = atob(base64Audio);
-      const arrayBuffer = new ArrayBuffer(audioData.length);
-      const view = new Uint8Array(arrayBuffer);
-      for (let i = 0; i < audioData.length; i++) view[i] = audioData.charCodeAt(i);
-      
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      const dataInt16 = new Int16Array(arrayBuffer);
-      const buffer = ctx.createBuffer(1, dataInt16.length, 24000);
-      const channelData = buffer.getChannelData(0);
-      for (let i = 0; i < dataInt16.length; i++) channelData[i] = dataInt16[i] / 32768.0;
-      
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(ctx.destination);
-      source.start();
-    }
-  } catch (e) {
-    console.error("Audio synthesis failed", e);
+export const getMentorResponse = async (
+  userCommand: string,
+  output: string,
+  currentLab: Lab | null,
+): Promise<string> => {
+  if (!currentLab) return "Choose a lab to begin. All terminal activity is simulated locally.";
+  if (output.startsWith("bash:") || output.startsWith("Unknown command")) {
+    return "That command is not implemented in this simulator. Use help to review the supported learning commands.";
   }
+  return `Practice feedback: review the output of “${userCommand}”, compare it with the objective, and record what the result tells you about the lab environment. This is simulated output, not a real system scan.`;
+};
+
+/** Uses the browser's built-in speech engine; no remote audio service or key. */
+export const speakInstruction = (text: string): void => {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 0.95;
+  utterance.pitch = 0.85;
+  window.speechSynthesis.speak(utterance);
 };
