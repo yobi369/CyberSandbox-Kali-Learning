@@ -29,3 +29,9 @@ export const matchesExpectedCommand = (
 
   return actual === expected || actual.startsWith(`${expected} `);
 };
+
+/** Award the completion milestone only the first time a lab is finished. */
+export const isFirstLabCompletion = (
+  labId: string,
+  completedLabIds: readonly string[],
+): boolean => !completedLabIds.includes(labId);
