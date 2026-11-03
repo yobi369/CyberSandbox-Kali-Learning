@@ -7,6 +7,7 @@ import { Lab, UserProgress, SandboxPersistence, TerminalLine } from './types';
 import { getMentorResponse, speakInstruction } from './services/geminiService';
 import { Shield, Activity, Wifi, Mic, MicOff, Network, Zap, Award, Cloud, Box, Cpu, Target, Radar } from 'lucide-react';
 import { INITIAL_FILES } from './constants';
+import { matchesExpectedCommand } from './services/labProgress';
 
 const PERSISTENCE_KEY = 'cyber_sandbox_elite_v5';
 
@@ -64,12 +65,7 @@ const App: React.FC = () => {
   const handleCommandResult = async (command: string, output: string) => {
     if (activeLab?.steps[currentStepIndex]) {
       const step = activeLab.steps[currentStepIndex];
-      const normalizedCommand = command.trim().toLowerCase();
-      const expected = step.expectedCommand?.trim().toLowerCase();
-      const commandTokens = normalizedCommand.split(/\\s+/);
-      const stepMatched = Boolean(expected && (expected.includes(' ')
-        ? normalizedCommand.startsWith(expected)
-        : commandTokens.includes(expected)));
+      const stepMatched = matchesExpectedCommand(command, step.expectedCommand);
       if (stepMatched) {
         setUserProgress(prev => ({ ...prev, xp: prev.xp + 150 }));
         if (currentStepIndex < activeLab.steps.length - 1) {
