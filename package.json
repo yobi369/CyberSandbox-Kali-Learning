@@ -1,12 +1,14 @@
 {
-  "name": "cybersandbox:-kali-learning-lab",
+  "name": "cybersandbox-kali-learning",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run build"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",
