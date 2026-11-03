@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchesExpectedCommand } from "./labProgress";
+import { isFirstLabCompletion, matchesExpectedCommand } from "./labProgress";
 
 describe("matchesExpectedCommand", () => {
   it("matches a complete command token", () => {
@@ -32,7 +32,6 @@ describe("matchesExpectedCommand", () => {
   });
 });
 
-import { isFirstLabCompletion } from "./labProgress";
 
 describe("isFirstLabCompletion", () => {
   it("allows a first completion", () => {
