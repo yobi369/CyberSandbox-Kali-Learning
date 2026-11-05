@@ -172,7 +172,7 @@ async function createInstitutionInvitation(request: IncomingMessage, response: S
     await recordAudit(client,session,'institution.invitation_created','invitation',invitation.rows[0].id);
     return invitation.rows[0];
   });
-  const path = '/?institution=' + encodeURIComponent(session.organizationSlug) + '&invite=' + encodeURIComponent(token);
+  const path = '/#institution=' + encodeURIComponent(session.organizationSlug) + '&invite=' + encodeURIComponent(token);
   const invitationUrl = process.env.APP_ORIGIN ? new URL(path,process.env.APP_ORIGIN).toString() : path;
   send(response,201,{ email,role,expiresAt:result.expires_at,invitationUrl,invitationToken:token,delivery:'manual-link' });
 }
@@ -182,13 +182,12 @@ async function acceptInstitutionInvitation(request: IncomingMessage, response: S
   const token = requireValue(body.token,'invitation token',128);
   const institutionSlug = requireValue(body.institutionSlug,'institution code',64).toLowerCase();
   const displayName = requireValue(body.displayName,'display name',160);
-  const password = requireValue(body.password,'password',1024);
-  if (token.length < 32 || password.length < 12 || !/^[a-z0-9][a-z0-9-]{1,62}$/.test(institutionSlug)) {
+  const password = typeof body.password === 'string' ? body.password : '';
+  if (token.length < 32 || password.length < 12 || password.length > 1024 || !/^[a-z0-9][a-z0-9-]{1,62}$/.test(institutionSlug)) {
     throw new HttpError(400,'Invalid invitation details or password length.');
   }
   const organization = await pool.query('SELECT id,name,slug FROM organizations WHERE slug = $1 AND status = $2',[institutionSlug,'active']);
   if (!organization.rowCount) throw new HttpError(404,'The invitation could not be verified.');
-  const passwordHash = await hashPassword(password);
   const sessionToken = createSessionToken();
   const result = await withInstitution(organization.rows[0].id,async(client)=>{
     const invitation = await client.query(
@@ -206,6 +205,7 @@ async function acceptInstitutionInvitation(request: IncomingMessage, response: S
       userId = user.id;
       userName = user.display_name;
     } else {
+      const passwordHash = await hashPassword(password);
       const created = await client.query('INSERT INTO users (email,display_name,password_hash) VALUES ($1,$2,$3) RETURNING id,display_name',[email,displayName,passwordHash]);
       userId = created.rows[0].id;
       userName = created.rows[0].display_name;
