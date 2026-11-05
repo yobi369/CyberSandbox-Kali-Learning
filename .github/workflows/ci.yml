@@ -72,3 +72,9 @@ jobs:
       - name: Build staging API container
         run: docker build --file Dockerfile.api --tag cybersandbox-api:ci .
 
+
+      - name: Validate local Compose configuration
+        env:
+          POSTGRES_PASSWORD: ci-local-postgres-password-with-32-characters
+          CYBERSANDBOX_APP_PASSWORD: ci-local-runtime-password-with-48-characters-minimum
+        run: docker compose config --quiet
