@@ -6,7 +6,7 @@ The API is a separate Node.js service. It must not share a process or filesystem
 
 - Node.js 22+
 - PostgreSQL 15+
-- Install dependencies with `npm install`.
+- Install dependencies with `npm install` (the repository currently does not commit a lockfile).
 - Build with `npm run api:build`.
 - Apply both versioned migrations with `npm run db:migrate` (001 core university schema; 002 academic governance, lab control-plane and research provenance).
 - Start with `npm run api:start`.
@@ -18,7 +18,7 @@ Required runtime configuration:
 - `PORT`: service port, default 4000.
 - `DATABASE_SSL=true` only for a database requiring verified TLS.
 
-Run migrations with a separate deployment database identity. Run the API with a non-owner role that has only the required DML privileges and cannot bypass row-level security. Do not grant the runtime role schema ownership, superuser, or BYPASSRLS.
+Run migrations with a separate deployment database identity. Run the API with a non-owner role that has only the required DML privileges and cannot bypass row-level security. Do not grant the runtime role schema ownership, superuser, or BYPASSRLS. The repeatable role bootstrap is in `ops/postgres/apply-runtime-role.sh` and `ops/postgres/runtime-role.sql`; run it as the migration identity after migrations, then set the API `DATABASE_URL` to the restricted role. See `docs/DEPLOYMENT_ACCEPTANCE.md` for the staging and release gates.
 
 ## First institution
 
