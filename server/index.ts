@@ -2,6 +2,9 @@ import { createApiServer } from './app.js';
 import { pool } from './database.js';
 
 const port = Number(process.env.PORT ?? 4000);
+if (process.env.NODE_ENV === 'production' && !process.env.APP_ORIGIN) {
+  throw new Error('APP_ORIGIN must be configured in production.');
+}
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
 
 const server = createApiServer();
