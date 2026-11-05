@@ -130,6 +130,17 @@ CREATE TABLE IF NOT EXISTS lesson_prerequisites (
   FOREIGN KEY (organization_id, prerequisite_lesson_id) REFERENCES learning_lessons(organization_id, id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS cohort_staff (
+  organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  cohort_id uuid NOT NULL,
+  lecturer_user_id uuid NOT NULL,
+  staff_role text NOT NULL DEFAULT 'lecturer' CHECK (staff_role IN ('lead', 'lecturer', 'teaching_assistant')),
+  assigned_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (organization_id, cohort_id, lecturer_user_id),
+  FOREIGN KEY (organization_id, cohort_id) REFERENCES cohorts(organization_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (lecturer_user_id, organization_id) REFERENCES memberships(user_id, organization_id)
+);
+
 CREATE TABLE IF NOT EXISTS enrollments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -140,6 +151,19 @@ CREATE TABLE IF NOT EXISTS enrollments (
   FOREIGN KEY (organization_id, cohort_id) REFERENCES cohorts(organization_id, id) ON DELETE CASCADE,
   FOREIGN KEY (student_user_id, organization_id) REFERENCES memberships(user_id, organization_id),
   UNIQUE (organization_id, cohort_id, student_user_id),
+  UNIQUE (organization_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS lesson_completions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  lesson_id uuid NOT NULL,
+  learner_user_id uuid NOT NULL,
+  completed_at timestamptz NOT NULL DEFAULT now(),
+  evidence jsonb NOT NULL DEFAULT '{}'::jsonb,
+  FOREIGN KEY (organization_id, lesson_id) REFERENCES learning_lessons(organization_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (learner_user_id, organization_id) REFERENCES memberships(user_id, organization_id),
+  UNIQUE (organization_id, lesson_id, learner_user_id),
   UNIQUE (organization_id, id)
 );
 
@@ -214,7 +238,7 @@ CREATE TABLE IF NOT EXISTS audit_events (
 DO $$
 DECLARE table_name text;
 BEGIN
-  FOREACH table_name IN ARRAY ARRAY['courses','course_versions','cohorts','learning_modules','learning_lessons','lesson_prerequisites','enrollments','assignments','submissions','assessments','audit_events']
+  FOREACH table_name IN ARRAY ARRAY['courses','course_versions','cohorts','learning_modules','learning_lessons','lesson_prerequisites','cohort_staff','enrollments','lesson_completions','assignments','submissions','assessments','audit_events']
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', table_name);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', table_name);
@@ -229,6 +253,8 @@ CREATE INDEX IF NOT EXISTS memberships_org_role_idx ON memberships (organization
 CREATE INDEX IF NOT EXISTS modules_course_version_idx ON learning_modules (organization_id, course_version_id, sequence);
 CREATE INDEX IF NOT EXISTS lessons_module_idx ON learning_lessons (organization_id, module_id, sequence);
 CREATE INDEX IF NOT EXISTS cohorts_org_course_idx ON cohorts (organization_id, course_id);
+CREATE INDEX IF NOT EXISTS cohort_staff_lecturer_idx ON cohort_staff (organization_id, lecturer_user_id);
+CREATE INDEX IF NOT EXISTS lesson_completions_learner_idx ON lesson_completions (organization_id, learner_user_id);
 CREATE INDEX IF NOT EXISTS enrollments_student_idx ON enrollments (organization_id, student_user_id);
 CREATE INDEX IF NOT EXISTS assignments_cohort_due_idx ON assignments (organization_id, cohort_id, due_at);
 CREATE INDEX IF NOT EXISTS submissions_assignment_student_idx ON submissions (organization_id, assignment_id, student_user_id);
