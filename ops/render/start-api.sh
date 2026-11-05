@@ -3,7 +3,6 @@ set -eu
 
 : "${MIGRATOR_DATABASE_URL:?MIGRATOR_DATABASE_URL must be set to the dedicated Supabase migration connection string}"
 : "${CYBERSANDBOX_APP_PASSWORD:?CYBERSANDBOX_APP_PASSWORD must be a generated 32+ character secret}"
-: "${APP_ORIGIN:?APP_ORIGIN must be the exact public frontend origin}"
 
 if [ "${#CYBERSANDBOX_APP_PASSWORD}" -lt 32 ]; then
   echo 'CYBERSANDBOX_APP_PASSWORD must contain at least 32 characters.' >&2
