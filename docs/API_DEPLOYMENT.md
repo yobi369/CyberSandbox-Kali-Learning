@@ -38,15 +38,16 @@ Run `npm run api:provision` in a controlled one-off job. These variables are con
 
 ## Current API surface
 
-- Authentication: POST /api/auth/login, GET /api/auth/session, POST /api/auth/logout.
+- Authentication and onboarding: POST /api/auth/login, GET /api/auth/session, POST /api/auth/logout, POST /api/invitations, POST /api/auth/accept-invitation. Invitations are one-time, hashed at rest, expire after seven days and are shared as manual links; no email delivery provider is connected.
 - Dashboards: GET /api/dashboard provides database-backed role metrics.
+- Institution directory: GET /api/admin/memberships?role=lecturer (or student/institution_admin).
 - Courses: GET /api/courses, GET /api/admin/courses, POST /api/courses, POST /api/courses/:id/modules, POST /api/modules/:id/lessons, POST /api/lessons/:id/prerequisites, POST /api/courses/:id/publish, GET /api/courses/:id/pathway.
 - Cohorts: GET /api/cohorts, POST /api/cohorts, POST /api/cohorts/:id/activate, POST /api/cohorts/:id/staff, POST /api/enrolments.
 - Assignments: GET /api/assignments, POST /api/assignments, POST /api/assignments/:id/publish, POST /api/assignments/:id/submissions.
 - Assessment: GET /api/submissions, POST /api/submissions/:id/assessments, GET /api/assessments/pending, POST /api/assessments/:id/moderate, GET /api/submissions/:id/grades.
 - Appeals: POST /api/submissions/:id/appeals, GET /api/appeals, POST /api/appeals/:id/resolve.
 - Exports: GET /api/exports/gradebook.csv and GET /api/exports/cohort-roster.csv.
-- Research metadata: POST /api/research/projects, POST /api/research/projects/:id/ethics-review, POST /api/research/projects/:id/workspaces, POST /api/research/workspaces/:id/experiments.
+- Research metadata: POST /api/research/projects, POST /api/research/projects/:id/ethics-review, POST /api/research/projects/:id/workspaces, POST /api/research/workspaces/:id/experiments, GET /api/research/projects/:id/provenance.
 - Lab definitions: POST /api/labs/definitions and POST /api/labs/definitions/:id/approve.
 
 ## Current limitations
@@ -55,7 +56,7 @@ The university portal and API are implementation work, not a deployed service. N
 
 PostgreSQL migration 002 adds immutable moderated grade history, appeals, export job metadata, lab session/control-plane records, research projects/workspaces/experiments/dataset metadata and hash-linked provenance. The current CSV exports are generated synchronously; the academic_exports queue table is reserved for future asynchronous artifact generation.
 
-Invitation delivery, password recovery, MFA, SSO, account lifecycle UI, grade appeal evidence storage, object storage, dataset upload/scanning, project collaborator membership and research result artifact storage remain future work.
+Email delivery, password recovery, MFA, SSO, full account lifecycle UI, grade appeal evidence storage, object storage, dataset upload/scanning, project collaborator membership and research result artifact storage remain future work.
 
 Live lab session creation deliberately returns HTTP 503 even if environment variables are set: no attested worker adapter is connected. Research workspace/experiment endpoints record metadata only; they do not execute code. The Firecracker/KVM runbook describes required host infrastructure and acceptance tests. Do not deploy student execution on the API host, Render web service or Vercel serverless functions.
 
