@@ -11,6 +11,7 @@ const valid: ResearchQueueRequest = {
   protocol: { method: 'replicated-simulation', replicates: 10 },
   datasets: [{ datasetId: '33333333-3333-4333-8333-333333333333', sha256: 'd'.repeat(64), license: 'CC-BY-4.0', consentBasis: 'Approved ethics protocol' }],
   quota: { cpuMillis: 2000, memoryMiB: 2048, diskMiB: 4096, maxDurationSeconds: 3600 },
+  networkPolicy: 'deny-all',
 };
 
 describe('research execution queue admission', () => {
