@@ -562,6 +562,45 @@ async function publishCourse(request: IncomingMessage, response: ServerResponse,
 }
 
 
+
+async function activateCohort(request: IncomingMessage, response: ServerResponse, cohortId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['institution_admin','platform_admin']);
+  requireUuid(cohortId);
+  const result = await inTenant(session, async (client) => {
+    const cohort = await client.query("UPDATE cohorts SET status = 'active' WHERE organization_id = $1 AND id = $2 AND status = 'planned' RETURNING id, status", [session.organizationId,cohortId]);
+    if (!cohort.rowCount) throw new HttpError(404, 'Planned cohort not found.');
+    await recordAudit(client,session,'cohort.activated','cohort',cohortId);
+    return cohort.rows[0];
+  });
+  send(response,200,result);
+}
+
+async function listAdminCourses(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session,['institution_admin','platform_admin']);
+  const courses = await inTenant(session,async(client)=>{
+    return (await client.query(
+      'SELECT c.id,c.code,c.title,c.description,c.level,c.status,cv.id AS course_version_id,cv.version,cv.published_at FROM courses c JOIN course_versions cv ON cv.course_id = c.id AND cv.organization_id = c.organization_id WHERE c.organization_id = $1 ORDER BY c.created_at DESC,cv.version DESC',
+      [session.organizationId],
+    )).rows;
+  });
+  send(response,200,{courses});
+}
+
+async function listCourseModules(request: IncomingMessage, response: ServerResponse, courseId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session,['institution_admin','platform_admin']);
+  requireUuid(courseId);
+  const modules = await inTenant(session,async(client)=>{
+    return (await client.query(
+      'SELECT m.id,m.slug,m.title,m.sequence,m.course_version_id,cv.version,cv.published_at FROM learning_modules m JOIN course_versions cv ON cv.id = m.course_version_id AND cv.organization_id = m.organization_id WHERE m.organization_id = $1 AND cv.course_id = $2 ORDER BY cv.version DESC,m.sequence',
+      [session.organizationId,courseId],
+    )).rows;
+  });
+  send(response,200,{modules});
+}
+
 async function createCourseModule(request: IncomingMessage, response: ServerResponse, courseId: string): Promise<void> {
   const session = await requireSession(request);
   requireRole(session, ['institution_admin', 'platform_admin']);
@@ -958,6 +997,12 @@ export function createApiServer() {
       if (request.method === 'GET' && url.pathname === '/api/auth/session') return await currentSession(request, response);
       if (request.method === 'POST' && url.pathname === '/api/auth/logout') return await logout(request, response);
 
+
+      if (request.method === 'GET' && url.pathname === '/api/admin/courses') return await listAdminCourses(request,response);
+      const adminModulesMatch = url.pathname.match(/^\/api\/admin\/courses\/([^/]+)\/modules$/);
+      if (request.method === 'GET' && adminModulesMatch) return await listCourseModules(request,response,decodeURIComponent(adminModulesMatch[1]));
+      const activateCohortMatch = url.pathname.match(/^\/api\/cohorts\/([^/]+)\/activate$/);
+      if (request.method === 'POST' && activateCohortMatch) return await activateCohort(request,response,decodeURIComponent(activateCohortMatch[1]));
       if (request.method === 'POST' && url.pathname === '/api/courses') return await createCourse(request, response);
       const publishCourseMatch = url.pathname.match(/^\/api\/courses\/([^/]+)\/publish$/);
       if (request.method === 'POST' && publishCourseMatch) return await publishCourse(request, response, decodeURIComponent(publishCourseMatch[1]));
