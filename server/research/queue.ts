@@ -126,8 +126,8 @@ export async function markResearchJobRunning(client: PoolClient, jobId: string, 
   );
   if (!result.rowCount) throw new Error('Research job lease is invalid, expired, or no longer owned by this worker.');
   await client.query(
-    \`UPDATE research_experiments e SET status='running' FROM execution_jobs j
-     WHERE j.id=$1 AND e.organization_id=j.organization_id AND e.id=j.resource_id AND j.job_type='research_experiment'\`,
+    `UPDATE research_experiments e SET status='running' FROM execution_jobs j
+     WHERE j.id=$1 AND e.organization_id=j.organization_id AND e.id=j.resource_id AND j.job_type='research_experiment'`,
     [jobId],
   );
 }
@@ -141,7 +141,7 @@ export async function finishResearchJob(client: PoolClient, input: { jobId: stri
        completed_at=CASE WHEN $4::boolean OR attempt_count >= max_attempts THEN now() ELSE NULL END,
        last_error_code=CASE WHEN $4::boolean THEN NULL ELSE $5 END,updated_at=now()
      WHERE id=$1 AND worker_id=$2 AND lease_token_hash=$3 AND status IN ('leased','running') AND lease_expires_at>now()
-     RETURNING organization_id,status`,
+     RETURNING organization_id,status,resource_id,job_type`,
     [input.jobId,input.workerId,hashLeaseToken(input.leaseToken),input.success,input.success ? null : (input.errorCode ?? 'worker_failed').slice(0,100)],
   );
   if (!result.rowCount) throw new Error('Research job lease is invalid, expired, or no longer owned by this worker.');
