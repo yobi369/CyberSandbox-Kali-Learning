@@ -425,6 +425,307 @@ async function moderateAssessment(request: IncomingMessage, response: ServerResp
   send(response, 200, result);
 }
 
+
+async function createCourse(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['institution_admin', 'platform_admin']);
+  const body = await readJson(request);
+  const code = requireValue(body.code, 'course code', 32).toUpperCase();
+  const title = requireValue(body.title, 'course title', 180);
+  const description = typeof body.description === 'string' ? body.description.slice(0, 5000) : '';
+  const level = body.level;
+  if (!['undergraduate', 'postgraduate', 'professional'].includes(String(level))) throw new HttpError(400, 'Invalid course level.');
+  const outcomes = Array.isArray(body.learningOutcomes) ? body.learningOutcomes : [];
+  if (outcomes.length > 30 || outcomes.some((x) => typeof x !== 'string' || !x.trim() || x.length > 500)) throw new HttpError(400, 'Learning outcomes must be up to 30 concise strings.');
+  const created = await inTenant(session, async (client) => {
+    const course = await client.query(
+      'INSERT INTO courses (organization_id, code, title, description, level) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      [session.organizationId, code, title, description, level],
+    );
+    const version = await client.query(
+      'INSERT INTO course_versions (organization_id, course_id, version, title, learning_outcomes, created_by) VALUES ($1, $2, 1, $3, $4::jsonb, $5) RETURNING id',
+      [session.organizationId, course.rows[0].id, title, JSON.stringify(outcomes), session.userId],
+    );
+    await recordAudit(client, session, 'course.created', 'course', course.rows[0].id);
+    return { courseId: course.rows[0].id, courseVersionId: version.rows[0].id, status: 'draft' };
+  });
+  send(response, 201, created);
+}
+
+async function publishCourse(request: IncomingMessage, response: ServerResponse, courseId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['institution_admin', 'platform_admin']);
+  requireUuid(courseId);
+  const published = await inTenant(session, async (client) => {
+    const course = await client.query('SELECT id, status FROM courses WHERE organization_id = $1 AND id = $2 FOR UPDATE', [session.organizationId, courseId]);
+    if (!course.rowCount) throw new HttpError(404, 'Course not found.');
+    const version = await client.query('SELECT id FROM course_versions WHERE organization_id = $1 AND course_id = $2 AND published_at IS NULL ORDER BY version DESC LIMIT 1', [session.organizationId, courseId]);
+    if (!version.rowCount) throw new HttpError(409, 'No unpublished course version is available.');
+    const lessons = await client.query('SELECT count(*)::int AS count FROM learning_lessons l JOIN learning_modules m ON m.id = l.module_id AND m.organization_id = l.organization_id WHERE l.organization_id = $1 AND m.course_version_id = $2', [session.organizationId, version.rows[0].id]);
+    if (Number(lessons.rows[0].count) === 0) throw new HttpError(409, 'A course needs at least one lesson before publication.');
+    await client.query('UPDATE course_versions SET published_at = now() WHERE organization_id = $1 AND id = $2', [session.organizationId, version.rows[0].id]);
+    await client.query("UPDATE courses SET status = 'published' WHERE organization_id = $1 AND id = $2", [session.organizationId, courseId]);
+    await recordAudit(client, session, 'course.published', 'course', courseId);
+    return { courseId, courseVersionId: version.rows[0].id, status: 'published' };
+  });
+  send(response, 200, published);
+}
+
+async function createCohort(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['institution_admin', 'platform_admin']);
+  const body = await readJson(request);
+  const courseId = requireUuid(requireValue(body.courseId, 'course identifier', 64));
+  const name = requireValue(body.name, 'cohort name', 120);
+  const startsAt = body.startsAt ? new Date(requireValue(body.startsAt, 'start date', 64)) : null;
+  const endsAt = body.endsAt ? new Date(requireValue(body.endsAt, 'end date', 64)) : null;
+  if ((startsAt && Number.isNaN(startsAt.getTime())) || (endsAt && Number.isNaN(endsAt.getTime())) || (startsAt && endsAt && endsAt <= startsAt)) throw new HttpError(400, 'Invalid cohort date range.');
+  const cohort = await inTenant(session, async (client) => {
+    const version = await client.query('SELECT id FROM course_versions WHERE organization_id = $1 AND course_id = $2 AND published_at IS NOT NULL ORDER BY version DESC LIMIT 1', [session.organizationId, courseId]);
+    if (!version.rowCount) throw new HttpError(409, 'Publish a course version before creating its cohort.');
+    const result = await client.query(
+      'INSERT INTO cohorts (organization_id, course_id, course_version_id, name, starts_at, ends_at, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+      [session.organizationId, courseId, version.rows[0].id, name, startsAt, endsAt, 'planned'],
+    );
+    await recordAudit(client, session, 'cohort.created', 'cohort', result.rows[0].id);
+    return { cohortId: result.rows[0].id, status: 'planned' };
+  });
+  send(response, 201, cohort);
+}
+
+async function assignLecturer(request: IncomingMessage, response: ServerResponse, cohortId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['institution_admin', 'platform_admin']);
+  requireUuid(cohortId);
+  const body = await readJson(request);
+  const lecturerId = requireUuid(requireValue(body.lecturerUserId, 'lecturer user identifier', 64));
+  const staffRole = body.staffRole ?? 'lecturer';
+  if (!['lead', 'lecturer', 'teaching_assistant'].includes(String(staffRole))) throw new HttpError(400, 'Invalid teaching role.');
+  const result = await inTenant(session, async (client) => {
+    const cohort = await client.query('SELECT id FROM cohorts WHERE organization_id = $1 AND id = $2', [session.organizationId, cohortId]);
+    if (!cohort.rowCount) throw new HttpError(404, 'Cohort not found.');
+    const lecturer = await client.query("SELECT 1 FROM memberships WHERE organization_id = $1 AND user_id = $2 AND role = 'lecturer' AND status = 'active'", [session.organizationId, lecturerId]);
+    if (!lecturer.rowCount) throw new HttpError(400, 'The selected user is not an active lecturer in this institution.');
+    await client.query('INSERT INTO cohort_staff (organization_id, cohort_id, lecturer_user_id, staff_role) VALUES ($1, $2, $3, $4) ON CONFLICT (organization_id, cohort_id, lecturer_user_id) DO UPDATE SET staff_role = EXCLUDED.staff_role', [session.organizationId, cohortId, lecturerId, staffRole]);
+    await recordAudit(client, session, 'cohort.lecturer_assigned', 'cohort', cohortId);
+    return { cohortId, lecturerUserId: lecturerId, staffRole };
+  });
+  send(response, 200, result);
+}
+
+async function publishAssignment(request: IncomingMessage, response: ServerResponse, assignmentId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['lecturer', 'institution_admin']);
+  requireUuid(assignmentId);
+  const result = await inTenant(session, async (client) => {
+    const assignment = await client.query('SELECT id, cohort_id, status, due_at FROM assignments WHERE organization_id = $1 AND id = $2 FOR UPDATE', [session.organizationId, assignmentId]);
+    if (!assignment.rowCount) throw new HttpError(404, 'Assignment not found.');
+    if (!await lecturerCanAccessCohort(client, session, assignment.rows[0].cohort_id)) throw new HttpError(403, 'You are not assigned to this cohort.');
+    if (assignment.rows[0].status !== 'draft') throw new HttpError(409, 'Only draft assignments can be published.');
+    if (assignment.rows[0].due_at && new Date(assignment.rows[0].due_at).getTime() <= Date.now()) throw new HttpError(400, 'Due date must be in the future.');
+    await client.query("UPDATE assignments SET status = 'published' WHERE organization_id = $1 AND id = $2", [session.organizationId, assignmentId]);
+    await recordAudit(client, session, 'assignment.published', 'assignment', assignmentId);
+    return { assignmentId, status: 'published' };
+  });
+  send(response, 200, result);
+}
+
+async function completeLesson(request: IncomingMessage, response: ServerResponse, lessonId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['student']);
+  requireUuid(lessonId);
+  const body = await readJson(request);
+  const evidence = body.evidence === undefined ? {} : body.evidence;
+  const encoded = JSON.stringify(evidence);
+  if (encoded.length > 10000) throw new HttpError(400, 'Lesson evidence is too large.');
+  const result = await inTenant(session, async (client) => {
+    const lesson = await client.query(
+      'SELECT l.id, m.course_version_id, cv.course_id FROM learning_lessons l JOIN learning_modules m ON m.id = l.module_id AND m.organization_id = l.organization_id JOIN course_versions cv ON cv.id = m.course_version_id AND cv.organization_id = m.organization_id WHERE l.organization_id = $1 AND l.id = $2 AND cv.published_at IS NOT NULL',
+      [session.organizationId, lessonId],
+    );
+    if (!lesson.rowCount) throw new HttpError(404, 'Published lesson not found.');
+    const enrollment = await client.query(
+      'SELECT 1 FROM cohorts h JOIN enrollments e ON e.cohort_id = h.id AND e.organization_id = h.organization_id WHERE h.organization_id = $1 AND h.course_id = $2 AND h.course_version_id = $3 AND h.status IN ($4, $5) AND e.student_user_id = $6 AND e.status = $7 LIMIT 1',
+      [session.organizationId, lesson.rows[0].course_id, lesson.rows[0].course_version_id, 'active', 'completed', session.userId, 'active'],
+    );
+    if (!enrollment.rowCount) throw new HttpError(403, 'An active enrolment in this course version is required.');
+    const prerequisites = await client.query(
+      'SELECT lp.prerequisite_lesson_id FROM lesson_prerequisites lp LEFT JOIN lesson_completions lc ON lc.lesson_id = lp.prerequisite_lesson_id AND lc.organization_id = lp.organization_id AND lc.learner_user_id = $3 WHERE lp.organization_id = $1 AND lp.lesson_id = $2 AND lc.id IS NULL',
+      [session.organizationId, lessonId, session.userId],
+    );
+    if (prerequisites.rowCount) throw new HttpError(409, 'Complete all prerequisite lessons first.');
+    const completion = await client.query(
+      'INSERT INTO lesson_completions (organization_id, lesson_id, learner_user_id, evidence) VALUES ($1, $2, $3, $4::jsonb) ON CONFLICT (organization_id, lesson_id, learner_user_id) DO UPDATE SET evidence = EXCLUDED.evidence, completed_at = now() RETURNING id, completed_at',
+      [session.organizationId, lessonId, session.userId, encoded],
+    );
+    await recordAudit(client, session, 'lesson.completed', 'lesson', lessonId);
+    return { completionId: completion.rows[0].id, completedAt: completion.rows[0].completed_at };
+  });
+  send(response, 200, result);
+}
+
+async function createAppeal(request: IncomingMessage, response: ServerResponse, submissionId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['student']);
+  requireUuid(submissionId);
+  const body = await readJson(request);
+  const reason = requireValue(body.reason, 'appeal reason', 10000);
+  if (reason.length < 20) throw new HttpError(400, 'Explain the appeal in at least 20 characters.');
+  const result = await inTenant(session, async (client) => {
+    const submission = await client.query("SELECT id FROM submissions WHERE organization_id = $1 AND id = $2 AND student_user_id = $3 AND status = 'graded'", [session.organizationId, submissionId, session.userId]);
+    if (!submission.rowCount) throw new HttpError(404, 'A graded submission belonging to you was not found.');
+    const existing = await client.query("SELECT id FROM grade_appeals WHERE organization_id = $1 AND submission_id = $2 AND status IN ('open','under_review')", [session.organizationId, submissionId]);
+    if (existing.rowCount) throw new HttpError(409, 'An active appeal already exists for this submission.');
+    const appeal = await client.query('INSERT INTO grade_appeals (organization_id, submission_id, learner_user_id, reason, evidence) VALUES ($1, $2, $3, $4, $5::jsonb) RETURNING id, status, created_at', [session.organizationId, submissionId, session.userId, reason, JSON.stringify(Array.isArray(body.evidence) ? body.evidence.slice(0, 10) : [])]);
+    await recordAudit(client, session, 'grade.appeal_opened', 'submission', submissionId);
+    return appeal.rows[0];
+  });
+  send(response, 201, result);
+}
+
+async function listAppeals(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const session = await requireSession(request);
+  const appeals = await inTenant(session, async (client) => {
+    let sql = 'SELECT ga.id, ga.submission_id, ga.learner_user_id, ga.reason, ga.status, ga.resolution, ga.created_at FROM grade_appeals ga WHERE ga.organization_id = $1';
+    const params: unknown[] = [session.organizationId];
+    if (session.role === 'student') { sql += ' AND ga.learner_user_id = $2'; params.push(session.userId); }
+    else if (session.role === 'lecturer') { sql += ' AND EXISTS (SELECT 1 FROM submissions s JOIN assignments a ON a.id = s.assignment_id AND a.organization_id = s.organization_id JOIN cohort_staff cs ON cs.cohort_id = a.cohort_id AND cs.organization_id = a.organization_id WHERE s.organization_id = ga.organization_id AND s.id = ga.submission_id AND cs.lecturer_user_id = $2)'; params.push(session.userId); }
+    else if (!['institution_admin', 'platform_admin'].includes(session.role)) throw new HttpError(403, 'Role cannot view appeals.');
+    sql += ' ORDER BY ga.created_at DESC LIMIT 250';
+    return (await client.query(sql, params)).rows;
+  });
+  send(response, 200, { appeals });
+}
+
+async function resolveAppeal(request: IncomingMessage, response: ServerResponse, appealId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['institution_admin', 'platform_admin']);
+  requireUuid(appealId);
+  const body = await readJson(request);
+  const decision = body.decision;
+  if (!['upheld', 'adjusted', 'rejected'].includes(String(decision))) throw new HttpError(400, 'Decision must be upheld, adjusted, or rejected.');
+  const resolution = requireValue(body.resolution, 'appeal resolution', 10000);
+  const result = await inTenant(session, async (client) => {
+    const appeal = await client.query("SELECT ga.id, ga.submission_id, ga.status, s.assignment_id FROM grade_appeals ga JOIN submissions s ON s.id = ga.submission_id AND s.organization_id = ga.organization_id WHERE ga.organization_id = $1 AND ga.id = $2 AND ga.status IN ('open','under_review') FOR UPDATE", [session.organizationId, appealId]);
+    if (!appeal.rowCount) throw new HttpError(404, 'Open appeal not found.');
+    let newGrade: number | null = null;
+    if (decision === 'adjusted') {
+      newGrade = Number(body.grade);
+      if (!Number.isFinite(newGrade) || newGrade < 0 || newGrade > 100) throw new HttpError(400, 'An adjusted grade between 0 and 100 is required.');
+      const prior = await client.query('SELECT a.assessed_by, a.rubric_version FROM assessments a WHERE a.organization_id = $1 AND a.submission_id = $2 ORDER BY a.version DESC LIMIT 1', [session.organizationId, appeal.rows[0].submission_id]);
+      if (!prior.rowCount || !prior.rows[0].assessed_by || prior.rows[0].assessed_by === session.userId) throw new HttpError(409, 'A distinct original assessor is required for an adjusted grade.');
+      const version = await client.query('SELECT COALESCE(max(version), 0) + 1 AS version FROM assessments WHERE organization_id = $1 AND submission_id = $2', [session.organizationId, appeal.rows[0].submission_id]);
+      const assessment = await client.query("INSERT INTO assessments (organization_id, submission_id, rubric_version, lecturer_feedback, score, moderation_status, assessed_by, moderated_by, version, assessed_at, moderated_at) VALUES ($1,$2,$3,$4,$5,'moderated',$6,$7,$8,now(),now()) RETURNING id", [session.organizationId, appeal.rows[0].submission_id, prior.rows[0].rubric_version, resolution, newGrade, prior.rows[0].assessed_by, session.userId, version.rows[0].version]);
+      await client.query('INSERT INTO grade_history (organization_id, submission_id, assessment_id, grade, feedback, rubric_version, recorded_by) VALUES ($1,$2,$3,$4,$5,$6,$7)', [session.organizationId, appeal.rows[0].submission_id, assessment.rows[0].id, newGrade, resolution, prior.rows[0].rubric_version, session.userId]);
+    }
+    await client.query('UPDATE grade_appeals SET status = $1, resolution = $2, resolved_by = $3, resolved_at = now() WHERE organization_id = $4 AND id = $5', [decision, resolution, session.userId, session.organizationId, appealId]);
+    await recordAudit(client, session, 'grade.appeal_' + String(decision), 'appeal', appealId);
+    return { appealId, status: decision, adjustedGrade: newGrade };
+  });
+  send(response, 200, result);
+}
+
+function csvCell(value: unknown): string {
+  const text = value === null || value === undefined ? '' : String(value);
+  return '"' + text.replace(/"/g, '""') + '"';
+}
+async function exportAcademicCsv(request: IncomingMessage, response: ServerResponse, kind: 'gradebook' | 'cohort_roster'): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['lecturer', 'institution_admin', 'platform_admin']);
+  const csv = await inTenant(session, async (client) => {
+    let rows;
+    if (kind === 'gradebook') {
+      const result = await client.query(
+        'SELECT c.code, h.name AS cohort, a.title AS assignment, u.email AS learner_email, u.display_name AS learner, gh.grade, gh.feedback, gh.recorded_at FROM grade_history gh JOIN submissions s ON s.id = gh.submission_id AND s.organization_id = gh.organization_id JOIN assignments a ON a.id = s.assignment_id AND a.organization_id = s.organization_id JOIN cohorts h ON h.id = a.cohort_id AND h.organization_id = a.organization_id JOIN courses c ON c.id = h.course_id AND c.organization_id = h.organization_id JOIN users u ON u.id = s.student_user_id WHERE gh.organization_id = $1 ORDER BY c.code, h.name, u.email, a.title',
+        [session.organizationId],
+      );
+      rows = [['course_code','cohort','assignment','learner_email','learner','grade','feedback','recorded_at'], ...result.rows.map((r) => [r.code,r.cohort,r.assignment,r.learner_email,r.learner,r.grade,r.feedback,r.recorded_at])];
+    } else {
+      const result = await client.query(
+        'SELECT c.code, h.name AS cohort, u.email, u.display_name, e.status, e.enrolled_at FROM enrollments e JOIN cohorts h ON h.id = e.cohort_id AND h.organization_id = e.organization_id JOIN courses c ON c.id = h.course_id AND c.organization_id = h.organization_id JOIN users u ON u.id = e.student_user_id WHERE e.organization_id = $1 ORDER BY c.code, h.name, u.email',
+        [session.organizationId],
+      );
+      rows = [['course_code','cohort','email','learner','enrollment_status','enrolled_at'], ...result.rows.map((r) => [r.code,r.cohort,r.email,r.display_name,r.status,r.enrolled_at])];
+    }
+    await recordAudit(client, session, 'academic_export.generated', kind, null);
+    return rows.map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
+  });
+  response.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="' + kind + '.csv"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+  response.end(csv);
+}
+
+async function createResearchProject(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['lecturer', 'institution_admin', 'platform_admin']);
+  const body = await readJson(request);
+  const title = requireValue(body.title, 'research title', 180);
+  const question = requireValue(body.researchQuestion, 'research question', 4000);
+  const abstract = typeof body.abstract === 'string' ? body.abstract.slice(0, 10000) : '';
+  const methodology = body.methodology && typeof body.methodology === 'object' && !Array.isArray(body.methodology) ? JSON.stringify(body.methodology) : '{}';
+  if (methodology.length > 20000) throw new HttpError(400, 'Methodology specification is too large.');
+  const ethics = body.ethicsStatus ?? 'pending';
+  if (!['pending', 'approved', 'not_required'].includes(String(ethics))) throw new HttpError(400, 'Invalid ethics status.');
+  const project = await inTenant(session, async (client) => {
+    const result = await client.query('INSERT INTO research_projects (organization_id, title, abstract, research_question, methodology, ethics_status, principal_investigator) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7) RETURNING id, status, ethics_status', [session.organizationId,title,abstract,question,methodology,ethics,session.userId]);
+    await recordAudit(client, session, 'research.project_created', 'research_project', result.rows[0].id);
+    return result.rows[0];
+  });
+  send(response, 201, project);
+}
+
+async function createResearchWorkspace(request: IncomingMessage, response: ServerResponse, projectId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['lecturer', 'institution_admin', 'platform_admin']);
+  requireUuid(projectId);
+  const body = await readJson(request);
+  const spec = body.environmentSpec && typeof body.environmentSpec === 'object' && !Array.isArray(body.environmentSpec) ? JSON.stringify(body.environmentSpec) : '{}';
+  const quota = body.resourceQuota && typeof body.resourceQuota === 'object' && !Array.isArray(body.resourceQuota) ? JSON.stringify(body.resourceQuota) : JSON.stringify({ cpuMillis: 1000, memoryMiB: 2048, diskMiB: 4096, maxDurationSeconds: 3600 });
+  if (spec.length > 10000 || quota.length > 2000) throw new HttpError(400, 'Workspace configuration is too large.');
+  const workspace = await inTenant(session, async (client) => {
+    const project = await client.query('SELECT id, ethics_status FROM research_projects WHERE organization_id = $1 AND id = $2', [session.organizationId, projectId]);
+    if (!project.rowCount) throw new HttpError(404, 'Research project not found.');
+    if (!['approved','not_required'].includes(project.rows[0].ethics_status)) throw new HttpError(409, 'Research ethics approval is required before provisioning a workspace.');
+    const result = await client.query("INSERT INTO research_workspaces (organization_id, project_id, owner_user_id, environment_spec, resource_quota, state) VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,'stopped') RETURNING id, state", [session.organizationId,projectId,session.userId,spec,quota]);
+    await recordAudit(client, session, 'research.workspace_created', 'research_workspace', result.rows[0].id);
+    return { ...result.rows[0], executionAvailable: false, message: 'Workspace metadata is provisioned; no compute worker is connected.' };
+  });
+  send(response, 201, workspace);
+}
+
+async function createResearchExperiment(request: IncomingMessage, response: ServerResponse, workspaceId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['lecturer', 'institution_admin', 'platform_admin']);
+  requireUuid(workspaceId);
+  const body = await readJson(request);
+  const title = requireValue(body.title, 'experiment title', 180);
+  const hypothesis = requireValue(body.hypothesis, 'experiment hypothesis', 4000);
+  const protocol = body.protocol && typeof body.protocol === 'object' && !Array.isArray(body.protocol) ? JSON.stringify(body.protocol) : '{}';
+  const revision = requireValue(body.codeRevision, 'source revision', 120);
+  const digest = requireValue(body.environmentDigest, 'environment digest', 160);
+  if (!/^[a-f0-9]{7,64}$/i.test(revision) || !/^(sha256:)?[a-f0-9]{64}$/i.test(digest) || protocol.length > 20000) throw new HttpError(400, 'Provide a source commit and immutable environment digest.');
+  const seed = Number(body.randomSeed);
+  if (!Number.isSafeInteger(seed) || seed < 0) throw new HttpError(400, 'A non-negative reproducibility seed is required.');
+  const result = await inTenant(session, async (client) => {
+    const workspace = await client.query('SELECT w.id, w.project_id, w.state, p.ethics_status FROM research_workspaces w JOIN research_projects p ON p.id = w.project_id AND p.organization_id = w.organization_id WHERE w.organization_id = $1 AND w.id = $2', [session.organizationId,workspaceId]);
+    if (!workspace.rowCount) throw new HttpError(404, 'Research workspace not found.');
+    if (!['approved','not_required'].includes(workspace.rows[0].ethics_status)) throw new HttpError(409, 'Research ethics approval is required.');
+    const experiment = await client.query("INSERT INTO research_experiments (organization_id, workspace_id, created_by, title, hypothesis, protocol, code_revision, environment_digest, random_seed, status) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,'queued') RETURNING id, status", [session.organizationId,workspaceId,session.userId,title,hypothesis,protocol,revision,digest,seed]);
+    await recordAudit(client, session, 'research.experiment_registered', 'research_experiment', experiment.rows[0].id);
+    return { ...experiment.rows[0], executionAvailable: false, message: 'Experiment provenance is registered; no execution worker is connected.' };
+  });
+  send(response, 201, result);
+}
+
+async function requestLabSession(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['student', 'lecturer']);
+  // Deliberately fail closed until an independently deployed, security-tested VM orchestrator exists.
+  if (process.env.LAB_ORCHESTRATOR_ENABLED !== 'true' || !process.env.LAB_ORCHESTRATOR_URL) {
+    throw new HttpError(503, 'Live Kali infrastructure is not configured. No VM or network namespace was created.');
+  }
+  throw new HttpError(503, 'The configured provider has not passed the worker attestation and network-isolation gate. Live sessions remain disabled.');
+}
+
 export function createApiServer() {
   return createServer(async (request, response) => {
     try {
@@ -441,6 +742,30 @@ export function createApiServer() {
       if (request.method === 'POST' && url.pathname === '/api/auth/login') return await login(request, response);
       if (request.method === 'GET' && url.pathname === '/api/auth/session') return await currentSession(request, response);
       if (request.method === 'POST' && url.pathname === '/api/auth/logout') return await logout(request, response);
+
+      if (request.method === 'POST' && url.pathname === '/api/courses') return await createCourse(request, response);
+      const publishCourseMatch = url.pathname.match(/^\/api\/courses\/([^/]+)\/publish$/);
+      if (request.method === 'POST' && publishCourseMatch) return await publishCourse(request, response, decodeURIComponent(publishCourseMatch[1]));
+      if (request.method === 'POST' && url.pathname === '/api/cohorts') return await createCohort(request, response);
+      const staffMatch = url.pathname.match(/^\/api\/cohorts\/([^/]+)\/staff$/);
+      if (request.method === 'POST' && staffMatch) return await assignLecturer(request, response, decodeURIComponent(staffMatch[1]));
+      const publishAssignmentMatch = url.pathname.match(/^\/api\/assignments\/([^/]+)\/publish$/);
+      if (request.method === 'POST' && publishAssignmentMatch) return await publishAssignment(request, response, decodeURIComponent(publishAssignmentMatch[1]));
+      const completeLessonMatch = url.pathname.match(/^\/api\/lessons\/([^/]+)\/complete$/);
+      if (request.method === 'POST' && completeLessonMatch) return await completeLesson(request, response, decodeURIComponent(completeLessonMatch[1]));
+      const appealMatch = url.pathname.match(/^\/api\/submissions\/([^/]+)\/appeals$/);
+      if (request.method === 'POST' && appealMatch) return await createAppeal(request, response, decodeURIComponent(appealMatch[1]));
+      if (request.method === 'GET' && url.pathname === '/api/appeals') return await listAppeals(request, response);
+      const resolveAppealMatch = url.pathname.match(/^\/api\/appeals\/([^/]+)\/resolve$/);
+      if (request.method === 'POST' && resolveAppealMatch) return await resolveAppeal(request, response, decodeURIComponent(resolveAppealMatch[1]));
+      if (request.method === 'GET' && url.pathname === '/api/exports/gradebook.csv') return await exportAcademicCsv(request, response, 'gradebook');
+      if (request.method === 'GET' && url.pathname === '/api/exports/cohort-roster.csv') return await exportAcademicCsv(request, response, 'cohort_roster');
+      if (request.method === 'POST' && url.pathname === '/api/research/projects') return await createResearchProject(request, response);
+      const researchWorkspaceMatch = url.pathname.match(/^\/api\/research\/projects\/([^/]+)\/workspaces$/);
+      if (request.method === 'POST' && researchWorkspaceMatch) return await createResearchWorkspace(request, response, decodeURIComponent(researchWorkspaceMatch[1]));
+      const experimentMatch = url.pathname.match(/^\/api\/research\/workspaces\/([^/]+)\/experiments$/);
+      if (request.method === 'POST' && experimentMatch) return await createResearchExperiment(request, response, decodeURIComponent(experimentMatch[1]));
+      if (request.method === 'POST' && url.pathname === '/api/labs/sessions') return await requestLabSession(request, response);
       if (request.method === 'GET' && url.pathname === '/api/dashboard') return await dashboard(request, response);
       if (request.method === 'GET' && url.pathname === '/api/courses') return await listCourses(request, response);
       if (request.method === 'POST' && url.pathname === '/api/enrolments') return await enrol(request, response);
