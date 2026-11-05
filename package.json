@@ -9,12 +9,15 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build && npm run api:build",
+    "api:build": "tsc -p tsconfig.server.json",
+    "api:start": "node dist-server/server/index.js"
   },
   "dependencies": {
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "lucide-react": "^0.562.0"
+    "lucide-react": "^0.562.0",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
@@ -25,6 +28,7 @@
     "tailwindcss": "^4.1.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@types/pg": "^8.15.5"
   }
 }
