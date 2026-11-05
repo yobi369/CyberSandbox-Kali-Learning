@@ -2,7 +2,7 @@
 
 ## Implemented records
 
-The database now records institution-owned research projects, ethics decisions, stopped workspace metadata, experiment specifications, dataset metadata and an append-only provenance chain. Project creation, workspace registration and experiment registration append hash-linked events under a per-project transaction lock. The API requires an immutable source revision, environment digest and random seed for each experiment.
+The database now records institution-owned research projects, ethics decisions, stopped workspace metadata, experiment specifications and an append-only provenance chain. Dataset metadata tables exist, but there is no dataset registration/upload API yet. Project creation, workspace registration and experiment registration append hash-linked events under a per-project transaction lock. The API requires an immutable source revision, environment digest and random seed for each experiment.
 
 Workspaces and experiments are currently metadata-only. There is no connected compute scheduler, artifact object store, dataset upload service, notebook runtime, GPU pool or experiment execution worker. The API does not claim that an experiment has run.
 
