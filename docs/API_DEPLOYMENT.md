@@ -36,6 +36,15 @@ Run `npm run api:provision` in a controlled one-off job. These variables are con
 
 `Dockerfile.api` builds a standalone API image. Supply the database and origin configuration at runtime. Apply migrations and bootstrap in separate one-off deployment jobs; do not automatically run schema changes or create administrator accounts every time the API starts.
 
+## Current API surface
+
+- `POST /api/auth/login`, `GET /api/auth/session`, and `POST /api/auth/logout`.
+- `GET /api/dashboard` returns database-backed metrics for students, lecturers, or institution administrators.
+- `GET /api/courses` and `GET /api/courses/:id/pathway` provide published course and learning-pathway reads within the verified institution.
+- `POST /api/enrolments` allows a student to enrol in an open cohort.
+- `GET /api/assignments`, `POST /api/assignments`, and `POST /api/assignments/:id/submissions` support assignment discovery, lecturer/admin creation, and student submissions.
+- `POST /api/submissions/:id/assessments` records a lecturer assessment; `POST /api/assessments/:id/moderate` records a separate moderation decision.
+
 ## Current limitations
 
 This is the first identity and tenant-schema slice, not a complete identity product. Invitation, password recovery, MFA, SSO, admin account lifecycle, dashboard APIs, and full authorization policies for academic operations remain future work. Integration tests against PostgreSQL with two institutions are required before pilot use.
