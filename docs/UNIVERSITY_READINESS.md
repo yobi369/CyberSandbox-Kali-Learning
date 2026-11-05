@@ -4,7 +4,7 @@
 
 This document defines the evidence required before CyberSandbox can be adopted as a university teaching platform. It is a product-readiness standard, not a claim of accreditation, institutional approval, or current production readiness.
 
-CyberSandbox currently provides a browser-only, deterministic simulator. It has no authentication, server-side records, instructor console, database, real Kali runtime, or isolated execution infrastructure. The existing simulator is suitable for supervised demonstrations and formative practice only.
+CyberSandbox now contains a simulated browser lab, a university portal UI, a Node.js/PostgreSQL API implementation, institution-scoped academic schemas and initial workflows. The API is not deployed and no institution is provisioned. Live Kali infrastructure and research compute are not connected. The repository is therefore still below Level 1 for institutional adoption.
 
 ## Intended users and learning modes
 
@@ -123,4 +123,4 @@ A deterministic heuristic must never be represented as an expert semantic grader
 
 ## Current honest status
 
-The repository currently meets part of the Level 0 foundation: a clearly labelled browser simulator, three core labs, structured deep-dive lessons, local formative assessments, and automated quality gates. It does not yet meet Level 1, Level 2, or Level 3. The roadmap must close these gaps incrementally and verify each gate with evidence.
+The repository has a stronger implementation foundation than the original Level 0 simulator: institution login UI, role-specific dashboards, server-side authentication/session code, PostgreSQL tenant isolation policies, academic course/cohort/assignment workflows, moderated grade history, appeals, CSV exports, and research metadata/provenance schemas. CI now provisions PostgreSQL and runs an initial two-institution RLS/role test. However, the API is not deployed, there is no provisioned institution, invitation/recovery/MFA/SSO and full account lifecycle are missing, PostgreSQL tests do not yet cover every API route or the exact production database role, and there is no live Kali worker, research compute, artifact storage, accessibility audit, academic content approval, backup/restore evidence or independent security review. It does not yet meet Level 1, Level 2 or Level 3.
