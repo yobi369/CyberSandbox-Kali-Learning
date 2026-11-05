@@ -63,14 +63,18 @@ integration('PostgreSQL institution row-level security', () => {
       const visible = await client.query('SELECT id FROM courses WHERE id = $1', [courseB]);
       expect(visible.rowCount).toBe(0);
 
+      await client.query('SAVEPOINT cross_tenant_write');
       await expect(client.query(
         "INSERT INTO courses (organization_id, code, title, level) VALUES ($1, 'FORBIDDEN', 'Cross tenant write', 'undergraduate')",
         [orgB],
       )).rejects.toThrow(/row-level security/i);
+      await client.query('ROLLBACK TO SAVEPOINT cross_tenant_write');
+      await client.query('SAVEPOINT invalid_role');
       await expect(client.query(
         'INSERT INTO cohort_staff (organization_id,cohort_id,lecturer_user_id,staff_role) VALUES ($1,$2,$3,$4)',
         [orgA,cohortA,studentUser,'lecturer'],
       )).rejects.toThrow(/required active institution membership role/i);
+      await client.query('ROLLBACK TO SAVEPOINT invalid_role');
       await client.query('ROLLBACK');
       await client.query('RESET ROLE');
     } finally {
