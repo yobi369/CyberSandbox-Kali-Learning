@@ -78,3 +78,48 @@ jobs:
           POSTGRES_PASSWORD: ci-local-postgres-password-with-32-characters
           CYBERSANDBOX_APP_PASSWORD: ci-local-runtime-password-with-48-characters-minimum
         run: docker compose config --quiet
+
+      - name: Start local stack and run container smoke tests
+        env:
+          POSTGRES_PASSWORD: ci-local-postgres-password-with-32-characters
+          CYBERSANDBOX_APP_PASSWORD: ci-local-runtime-password-with-48-characters-minimum
+        run: |
+          set -eu
+          docker compose up --build --detach
+          cleanup() {
+            docker compose logs --no-color || true
+            docker compose down --volumes --remove-orphans
+          }
+          trap cleanup EXIT
+
+          api_ready=false
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:4000/health > /tmp/cybersandbox-health.json; then
+              api_ready=true
+              break
+            fi
+            sleep 2
+          done
+          test "$api_ready" = true
+          grep -q '"status":"ok"' /tmp/cybersandbox-health.json
+
+          frontend_ready=false
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/ > /tmp/cybersandbox-frontend.html; then
+              frontend_ready=true
+              break
+            fi
+            sleep 2
+          done
+          test "$frontend_ready" = true
+          grep -qi '<html' /tmp/cybersandbox-frontend.html
+
+          # Confirm the frontend development proxy reaches the API.
+          curl --fail --silent http://127.0.0.1:3000/health | grep -q '"status":"ok"'
+
+          # Confirm migrations ran and the restricted role can connect.
+          migration_count="$(docker compose exec -T db psql -U postgres -d cybersandbox -Atc 'SELECT count(*) FROM schema_migrations')"
+          test "$migration_count" = "3"
+          docker compose exec -T -e PGPASSWORD="$CYBERSANDBOX_APP_PASSWORD" db \
+            psql -h 127.0.0.1 -U cybersandbox_app -d cybersandbox -Atc 'SELECT current_user' |
+            grep -qx 'cybersandbox_app'
