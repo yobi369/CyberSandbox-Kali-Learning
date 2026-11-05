@@ -78,6 +78,7 @@ export async function enqueueResearchExperiment(organizationId: string, actorUse
       [organizationId,input.experimentId,payload,digest],
     );
     await client.query('UPDATE research_experiments SET status=$3 WHERE organization_id=$1 AND id=$2',[organizationId,input.experimentId,'queued']);
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[input.projectId]);
     await client.query(
       `INSERT INTO research_provenance(organization_id,project_id,experiment_id,actor_user_id,event_type,payload,sequence_no,previous_hash,event_hash)
        SELECT $1,$2,$3,$4,'experiment_queued',$5::jsonb,
@@ -124,6 +125,11 @@ export async function markResearchJobRunning(client: PoolClient, jobId: string, 
     [jobId,workerId,hashLeaseToken(leaseToken)],
   );
   if (!result.rowCount) throw new Error('Research job lease is invalid, expired, or no longer owned by this worker.');
+  await client.query(
+    \`UPDATE research_experiments e SET status='running' FROM execution_jobs j
+     WHERE j.id=$1 AND e.organization_id=j.organization_id AND e.id=j.resource_id AND j.job_type='research_experiment'\`,
+    [jobId],
+  );
 }
 
 export async function finishResearchJob(client: PoolClient, input: { jobId: string; workerId: string; leaseToken: string; success: boolean; errorCode?: string }): Promise<void> {
@@ -140,6 +146,10 @@ export async function finishResearchJob(client: PoolClient, input: { jobId: stri
   );
   if (!result.rowCount) throw new Error('Research job lease is invalid, expired, or no longer owned by this worker.');
   await client.query('UPDATE execution_workers SET active_jobs=GREATEST(0,active_jobs-1),updated_at=now() WHERE id=$1',[input.workerId]);
+  if (result.rows[0].job_type === 'research_experiment' && result.rows[0].status !== 'queued') {
+    await client.query('UPDATE research_experiments SET status=$3,completed_at=now() WHERE organization_id=$1 AND id=$2',
+      [result.rows[0].organization_id,result.rows[0].resource_id,result.rows[0].status === 'succeeded' ? 'completed' : 'failed']);
+  }
   await client.query(
     'INSERT INTO execution_job_events(organization_id,job_id,event_type,details) VALUES($1,$2,$3,$4::jsonb)',
     [result.rows[0].organization_id,input.jobId,result.rows[0].status,JSON.stringify({workerId:input.workerId,errorCode:input.errorCode ?? null})],
