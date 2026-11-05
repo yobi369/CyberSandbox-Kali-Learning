@@ -9,7 +9,7 @@ The API foundation adds server-side sign-in, opaque cookie sessions, institution
 - Run the API as a separate Node.js service from the Vite static frontend.
 - Configure `DATABASE_URL`, `PORT`, `NODE_ENV`, and the exact frontend `APP_ORIGIN`.
 - Use TLS at the ingress and set `DATABASE_SSL=true` only when the database endpoint requires verified TLS.
-- Apply `db/migrations/001_university_core.sql` using a migration identity before starting the API.
+- Apply ordered migrations 001 and 002 with `npm run db:migrate` using a dedicated migration identity before starting the API.
 - Use a least-privilege runtime database role. It must not own tenant tables or have BYPASSRLS; table ownership and migration privileges belong to a separate deployment identity.
 - Do not expose PostgreSQL publicly.
 
@@ -29,15 +29,15 @@ The API foundation adds server-side sign-in, opaque cookie sessions, institution
 
 Every tenant-owned academic table includes `organization_id`, composite foreign keys prevent cross-institution parent references, and PostgreSQL row-level security compares the row tenant with the transaction-local `app.current_organization_id` setting.
 
-Protected data access must use `withInstitution(verifiedMembership.organizationId, callback)`. The organization ID must come from a verified server session and active membership, never directly from request JSON, query parameters, or browser storage.
+Protected data access must use the API's `inTenant(verifiedSession, callback)` wrapper, which rechecks active membership inside the transaction before setting the transaction-local RLS context. The organization ID must come from a verified server session and active membership, never directly from request JSON, query parameters, or browser storage. PostgreSQL triggers additionally validate institution roles for enrolments, lecturer assignments, submissions, course versions, assessments, appeals, research records and lab ownership.
 
 The API runtime database role must not own tables, bypass row-level security, or inherit the migration role. RLS is not a substitute for authorization: each future endpoint must also check role, cohort membership, resource ownership, and operation-specific permissions.
 
 ## Academic API slice
 
-The authenticated API now exposes institution-scoped role dashboards, published course discovery, course pathway reads, student cohort enrolment, assignment listing and creation, student submissions, lecturer assessment, and a separate moderation decision. Lecturer access to cohort work is checked against the cohort teaching assignment. A lecturer cannot moderate their own assessment; an institution administrator or a different assigned lecturer must do so. Dashboard figures are database aggregates, not browser-generated demo values.
+The authenticated API now exposes role dashboards, course/module/lesson administration, immutable course publication, prerequisite-aware pathway completion, cohort creation/activation, lecturer assignment, student enrolment, assignment publication, submissions, assessment, independent moderation, grade history, appeals and institution-scoped CSV exports. Research project metadata, administrator ethics decisions, workspace/experiment manifests and hash-linked provenance are also implemented. The React portal is now the primary UI entry point with role-specific workspaces.
 
-Course and course-version publication, cohort/staff provisioning, account invitations, lesson-completion writes, grade appeals, and full administrative UI are not yet implemented. Academic API endpoints are not ready for institutional pilot until PostgreSQL integration tests prove the role and tenant boundaries.
+PostgreSQL migration 002 adds role-enforcement triggers, append-only grade/provenance records, immutable published curriculum, lab session/control-plane tables and research metadata. The CI workflow now runs a real PostgreSQL two-institution RLS and role-enforcement test. Do not call the platform pilot-ready until the latest CI run passes and the same tests are run using the exact non-owner runtime role in staging.
 
 ## API errors and operational requirements
 
@@ -52,4 +52,4 @@ Before institutional pilot:
 - Add an audited bootstrap/provisioning command and an operational account recovery process.
 - Add privacy retention, consent, export, and deletion workflows.
 
-No real institution account is provisioned by this code alone. No user-facing login is considered deployable until a secure institution bootstrap and integration test are completed.
+No real institution account is provisioned and the API is not deployed. The portal expects same-origin /api routing. Invitation, password recovery, MFA, SSO, user lifecycle management, and production session/device management remain future work. Live Kali sessions and research compute are disabled; their schemas and metadata APIs do not provision or execute workloads.
