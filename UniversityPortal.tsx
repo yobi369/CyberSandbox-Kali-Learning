@@ -24,7 +24,7 @@ export default function UniversityPortal({onOpenSimulator}:{onOpenSimulator:()=>
   const [gradeHistory,setGradeHistory]=useState<Record<string,Row[]>>({});
   const [courses,setCourses]=useState<Row[]>([]),[cohorts,setCohorts]=useState<Row[]>([]),[assignments,setAssignments]=useState<Row[]>([]),[submissions,setSubmissions]=useState<Row[]>([]),[pending,setPending]=useState<Row[]>([]),[appeals,setAppeals]=useState<Row[]>([]);
   const [tab,setTab]=useState('overview'),[loading,setLoading]=useState(false),[offline,setOffline]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
-  const params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(window.location.hash.slice(1) || window.location.search);
   const [inviteToken,setInviteToken]=useState(params.get('invite')??'');
   const [acceptForm,setAcceptForm]=useState({displayName:'',password:''});
   const [inviteForm,setInviteForm]=useState({email:'',role:'student'});
