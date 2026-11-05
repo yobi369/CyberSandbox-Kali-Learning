@@ -7,7 +7,7 @@ const field = 'w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.
 const primary = 'rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-cyan-300 disabled:opacity-40';
 const secondary = 'rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:border-cyan-500';
 const panel = 'rounded-2xl border border-slate-800 bg-slate-900/70 p-5';
-const API_ORIGIN = ((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_API_ORIGIN ?? '').replace(/\\/+$/, '');
+const API_ORIGIN = ((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_API_ORIGIN ?? '').replace(/\/+$/, '');
 async function api<T=any>(path:string, init:RequestInit={}):Promise<T>{
   const response=await fetch(API_ORIGIN + path,{...init,credentials:'include',headers:{...(init.body?{'content-type':'application/json'}:{}),...(init.headers??{})}});
   const type=response.headers.get('content-type')??'';
