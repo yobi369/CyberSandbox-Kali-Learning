@@ -8,10 +8,10 @@ const migrations = ['001_university_core', '002_academic_labs_research'];
 const client = await pool.connect();
 try {
   await client.query('BEGIN');
-  await client.query(\`CREATE TABLE IF NOT EXISTS schema_migrations (
+  await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
     version text PRIMARY KEY,
     applied_at timestamptz NOT NULL DEFAULT now()
-  )\`);
+  )`);
   await client.query('COMMIT');
 
   for (const version of migrations) {
