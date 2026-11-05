@@ -563,10 +563,11 @@ async function assessSubmission(request: IncomingMessage, response: ServerRespon
   if (!Number.isFinite(score) || score < 0 || score > 100) throw new HttpError(400, 'Score must be between 0 and 100.');
   const assessment = await inTenant(session, async (client) => {
     const source = await client.query(
-      'SELECT s.id, a.cohort_id, a.rubric_version FROM submissions s JOIN assignments a ON a.id = s.assignment_id AND a.organization_id = s.organization_id WHERE s.organization_id = $1 AND s.id = $2 FOR UPDATE OF s',
+      'SELECT s.id, s.status, a.cohort_id, a.rubric_version FROM submissions s JOIN assignments a ON a.id = s.assignment_id AND a.organization_id = s.organization_id WHERE s.organization_id = $1 AND s.id = $2 FOR UPDATE OF s',
       [session.organizationId, submissionId],
     );
     if (!source.rowCount) throw new HttpError(404, 'Submission not found.');
+    if (!['submitted','resubmitted'].includes(source.rows[0].status)) throw new HttpError(409, 'Only a newly submitted or resubmitted attempt can be assessed.');
     if (!await lecturerCanAccessCohort(client, session, source.rows[0].cohort_id)) throw new HttpError(403, 'You are not assigned to this cohort.');
     const nextVersion = await client.query('SELECT COALESCE(max(version), 0) + 1 AS version FROM assessments WHERE organization_id = $1 AND submission_id = $2', [session.organizationId, submissionId]);
     const inserted = await client.query(
@@ -922,11 +923,11 @@ async function resolveAppeal(request: IncomingMessage, response: ServerResponse,
     const appeal = await client.query("SELECT ga.id, ga.submission_id, ga.status, s.assignment_id FROM grade_appeals ga JOIN submissions s ON s.id = ga.submission_id AND s.organization_id = ga.organization_id WHERE ga.organization_id = $1 AND ga.id = $2 AND ga.status IN ('open','under_review') FOR UPDATE", [session.organizationId, appealId]);
     if (!appeal.rowCount) throw new HttpError(404, 'Open appeal not found.');
     let newGrade: number | null = null;
+    const prior = await client.query('SELECT a.assessed_by, a.rubric_version FROM assessments a WHERE a.organization_id = $1 AND a.submission_id = $2 ORDER BY a.version DESC LIMIT 1', [session.organizationId, appeal.rows[0].submission_id]);
+    if (!prior.rowCount || !prior.rows[0].assessed_by || prior.rows[0].assessed_by === session.userId) throw new HttpError(409, 'A reviewer who did not issue the original grade must resolve this appeal.');
     if (decision === 'adjusted') {
       newGrade = Number(body.grade);
       if (!Number.isFinite(newGrade) || newGrade < 0 || newGrade > 100) throw new HttpError(400, 'An adjusted grade between 0 and 100 is required.');
-      const prior = await client.query('SELECT a.assessed_by, a.rubric_version FROM assessments a WHERE a.organization_id = $1 AND a.submission_id = $2 ORDER BY a.version DESC LIMIT 1', [session.organizationId, appeal.rows[0].submission_id]);
-      if (!prior.rowCount || !prior.rows[0].assessed_by || prior.rows[0].assessed_by === session.userId) throw new HttpError(409, 'A distinct original assessor is required for an adjusted grade.');
       const version = await client.query('SELECT COALESCE(max(version), 0) + 1 AS version FROM assessments WHERE organization_id = $1 AND submission_id = $2', [session.organizationId, appeal.rows[0].submission_id]);
       const assessment = await client.query("INSERT INTO assessments (organization_id, submission_id, rubric_version, lecturer_feedback, score, moderation_status, assessed_by, moderated_by, version, assessed_at, moderated_at) VALUES ($1,$2,$3,$4,$5,'moderated',$6,$7,$8,now(),now()) RETURNING id", [session.organizationId, appeal.rows[0].submission_id, prior.rows[0].rubric_version, resolution, newGrade, prior.rows[0].assessed_by, session.userId, version.rows[0].version]);
       await client.query('INSERT INTO grade_history (organization_id, submission_id, assessment_id, grade, feedback, rubric_version, recorded_by) VALUES ($1,$2,$3,$4,$5,$6,$7)', [session.organizationId, appeal.rows[0].submission_id, assessment.rows[0].id, newGrade, resolution, prior.rows[0].rubric_version, session.userId]);
