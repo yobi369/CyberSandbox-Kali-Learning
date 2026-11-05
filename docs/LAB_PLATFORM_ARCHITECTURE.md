@@ -2,7 +2,16 @@
 
 ## Current implementation boundary
 
-The current application is a browser-only React + TypeScript simulator. It has no backend, database, identity provider, instructor service, or container/VM runtime. Terminal output is deterministic training data. This document describes the target architecture; it does not claim these components exist.
+The repository now contains a React university portal, Node.js API, PostgreSQL migrations, server-side session authentication, tenant RLS, academic workflows and research/lab control-plane metadata. The API is not deployed and no institution is provisioned. The original terminal remains a deterministic simulator. Lab definition registration is implemented, but live session creation deliberately returns HTTP 503 because no independently attested worker provider is connected. Research workspace and experiment endpoints register metadata only; they do not execute code. This document distinguishes implemented control-plane records from the future isolated execution plane.
+
+## Implemented control-plane slice
+
+- Same-origin university portal UI with institution sign-in and role-aware student, lecturer and administrator workspaces.
+- Node.js API with opaque cookie sessions and active membership checks inside tenant transactions.
+- PostgreSQL RLS policies and role-enforcement triggers, including cross-institution composite foreign keys.
+- Course versions, modules, lessons, prerequisites, cohorts, lecturer assignments, enrolments, assignments, submissions, assessment moderation, grade history, appeals and CSV exports.
+- Research project metadata, administrator ethics decisions, experiment manifests and append-only hash-linked provenance.
+- Lab definitions and database schema for sessions/events/quotas; live execution remains disabled.
 
 ## Target system overview
 
@@ -116,12 +125,12 @@ Before enabling live execution:
 Keep simulator mode independently deployable. Introduce live lab execution behind a separate feature flag and separate infrastructure boundary. Do not make the web application depend on a live lab worker to serve curriculum pages.
 
 Roll out incrementally:
-1. Server-side identity and tenant-aware learning records.
-2. Instructor, cohort, and assignment workflows.
-3. Assessment moderation and audit.
-4. Isolated lab orchestration in a non-production pilot.
-5. Independent security validation.
-6. Institution-controlled rollout.
+1. Complete API-level PostgreSQL integration tests, account lifecycle and institution bootstrap/deployment.
+2. Complete dashboard and academic administration UI, moderation/appeals workflows and backup/restore evidence.
+3. Deploy a dedicated KVM/Firecracker worker pool and session gateway outside the application host.
+4. Pass network isolation, VM escape, quotas, crash recovery and verified teardown tests.
+5. Connect research object storage and isolated experiment workers with immutable manifests and independent reproduction.
+6. Obtain academic, privacy, accessibility and independent security sign-off before institutional pilot.
 
 ## Operational signals
 
