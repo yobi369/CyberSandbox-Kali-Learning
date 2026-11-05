@@ -884,7 +884,8 @@ async function reviewResearchEthics(request: IncomingMessage, response: ServerRe
   const decision = body.decision;
   if (!['approved','rejected','not_required'].includes(String(decision))) throw new HttpError(400, 'Invalid ethics decision.');
   const reference = requireValue(body.reference, 'ethics review reference', 240);
-  const rationale = requireValue(body.rationale, 'ethics review rationale', 30,);
+  const rationale = requireValue(body.rationale, 'ethics review rationale', 4000);
+  if (rationale.length < 30) throw new HttpError(400, 'Provide at least 30 characters explaining the ethics decision.');
   const result = await inTenant(session, async (client) => {
     const project = await client.query("UPDATE research_projects SET ethics_status = $1, ethics_reference = $2, ethics_reviewed_by = $3, ethics_reviewed_at = now() WHERE organization_id = $4 AND id = $5 AND ethics_status = 'pending' RETURNING id", [decision,reference,session.userId,session.organizationId,projectId]);
     if (!project.rowCount) throw new HttpError(404, 'Pending research project not found.');
