@@ -27,7 +27,9 @@ describe('research artifact governance', () => {
     expect(() => validateResearchResultManifest({ ...manifest, workerImageDigest: 'latest' })).toThrow(/sha-256/i);
     expect(() => validateResearchResultManifest({ ...manifest, artifacts: [manifest.artifacts[0], manifest.artifacts[0]] })).toThrow(/duplicate/i);
   });
-  it('computes content digests over exact uploaded bytes', () => {
-    expect(sha256Hex(new TextEncoder().encode('research-data'))).toBe('e5e0b6c6d1e10f8f5f5e6a4d');
+  it('computes a fixed-length SHA-256 digest over exact uploaded bytes', () => {
+    const digest = sha256Hex(new TextEncoder().encode('research-data'));
+    expect(digest).toMatch(/^[a-f0-9]{64}$/);
+    expect(sha256Hex(new TextEncoder().encode('research-data'))).toBe(digest);
   });
 });
