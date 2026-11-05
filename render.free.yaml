@@ -1,5 +1,6 @@
-# Free public demo only. This file deliberately creates no database resource.
-# Supply a dedicated Supabase Free Postgres connection string in the API service.
+# Free API service only. Frontend is hosted on Cloudflare Pages and proxies /api
+# to this service so the browser keeps a same-origin, host-only session cookie.
+# This Blueprint intentionally creates no database.
 services:
   - type: web
     name: cybersandbox-api-free
@@ -25,13 +26,3 @@ services:
         sync: false
       - key: CYBERSANDBOX_APP_PASSWORD
         sync: false
-
-  - type: web
-    name: cybersandbox-web-free
-    runtime: static
-    buildCommand: npm install --no-audit --no-fund && npm run build
-    staticPublishPath: ./dist
-    autoDeployTrigger: checksPass
-    envVars:
-      - key: VITE_API_ORIGIN
-        value: https://cybersandbox-api-free.onrender.com
