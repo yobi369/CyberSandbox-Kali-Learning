@@ -236,17 +236,23 @@ BEGIN
     IF TG_OP <> 'INSERT' AND OLD.published_at IS NOT NULL THEN
       RAISE EXCEPTION 'Published course versions are immutable';
     END IF;
+    IF TG_OP = 'UPDATE' AND NEW.published_at IS NOT NULL AND (to_jsonb(NEW) - 'published_at') IS DISTINCT FROM (to_jsonb(OLD) - 'published_at') THEN
+      RAISE EXCEPTION 'Publishing cannot modify course version content';
+    END IF;
     IF TG_OP = 'INSERT' AND NEW.published_at IS NOT NULL THEN
       RAISE EXCEPTION 'Course versions must be published through the application workflow';
     END IF;
     IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
   ELSIF TG_TABLE_NAME = 'learning_modules' THEN
+    IF TG_OP = 'UPDATE' THEN RAISE EXCEPTION 'Curriculum records are versioned; create a new course version'; END IF;
     version_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.course_version_id ELSE NEW.course_version_id END;
   ELSIF TG_TABLE_NAME = 'learning_lessons' THEN
+    IF TG_OP = 'UPDATE' THEN RAISE EXCEPTION 'Curriculum records are versioned; create a new course version'; END IF;
     SELECT course_version_id INTO version_id FROM learning_modules
     WHERE organization_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.organization_id ELSE NEW.organization_id END
       AND id = CASE WHEN TG_OP = 'DELETE' THEN OLD.module_id ELSE NEW.module_id END;
   ELSIF TG_TABLE_NAME = 'lesson_prerequisites' THEN
+    IF TG_OP = 'UPDATE' THEN RAISE EXCEPTION 'Curriculum records are versioned; create a new course version'; END IF;
     SELECT m.course_version_id INTO version_id
     FROM learning_lessons l JOIN learning_modules m ON m.id = l.module_id AND m.organization_id = l.organization_id
     WHERE l.organization_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.organization_id ELSE NEW.organization_id END
@@ -324,7 +330,7 @@ BEGIN
   IF NOT FOUND OR member_status <> 'active' OR target_role <> ALL(allowed_roles) THEN
     RAISE EXCEPTION 'Actor does not have the required active institution membership role for %', TG_TABLE_NAME;
   END IF;
-  IF TG_TABLE_NAME = 'submissions' THEN
+  IF TG_TABLE_NAME = 'submissions' AND TG_OP = 'INSERT' THEN
     IF NOT EXISTS (
       SELECT 1 FROM assignments a JOIN enrollments e
         ON e.organization_id = a.organization_id AND e.cohort_id = a.cohort_id
