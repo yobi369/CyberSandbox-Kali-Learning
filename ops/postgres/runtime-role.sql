@@ -12,11 +12,9 @@ SELECT format('GRANT CONNECT ON DATABASE %I TO cybersandbox_app', current_databa
 
 GRANT USAGE ON SCHEMA public TO cybersandbox_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO cybersandbox_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO cybersandbox_app;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO cybersandbox_app;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO cybersandbox_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO cybersandbox_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO cybersandbox_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO cybersandbox_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE ON SEQUENCES TO cybersandbox_app;
 REVOKE CREATE ON SCHEMA public FROM cybersandbox_app;
 ALTER ROLE cybersandbox_app SET idle_in_transaction_session_timeout = '15s';
 ALTER ROLE cybersandbox_app SET statement_timeout = '30s';
