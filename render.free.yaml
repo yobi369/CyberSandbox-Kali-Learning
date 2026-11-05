@@ -1,0 +1,28 @@
+# Free API service only. Frontend is hosted on Cloudflare Pages and proxies /api
+# to this service so the browser keeps a same-origin, host-only session cookie.
+# This Blueprint intentionally creates no database.
+services:
+  - type: web
+    name: cybersandbox-api-free
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile.api
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_POOL_MAX
+        value: "3"
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_SSL_CA_BASE64
+        sync: false
+      - key: APP_ORIGIN
+        sync: false
+      - key: MIGRATOR_DATABASE_URL
+        sync: false
+      - key: CYBERSANDBOX_APP_PASSWORD
+        sync: false

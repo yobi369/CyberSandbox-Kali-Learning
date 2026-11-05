@@ -7,6 +7,8 @@ if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
 const migrations = ['001_university_core', '002_academic_labs_research', '003_execution_control_plane'];
 const client = await pool.connect();
 try {
+  // Serialize startup migrations when a free host restarts or replaces its single instance.
+  await client.query('SELECT pg_advisory_lock(73421, 1)');
   await client.query('BEGIN');
   await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
     version text PRIMARY KEY,
@@ -32,6 +34,7 @@ try {
   await client.query('ROLLBACK');
   throw error;
 } finally {
+  try { await client.query('SELECT pg_advisory_unlock(73421, 1)'); } catch { /* connection closes and releases the lock */ }
   client.release();
   await pool.end();
 }

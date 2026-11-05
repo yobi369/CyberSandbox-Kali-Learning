@@ -1145,13 +1145,34 @@ export function createApiServer() {
     try {
       const url = new URL(request.url ?? '/', 'http://localhost');
       const origin = request.headers.origin;
-      const allowedOrigin = process.env.APP_ORIGIN;
-      if (origin && allowedOrigin && origin !== allowedOrigin) throw new HttpError(403, 'Cross-origin request rejected.');
+      const allowedOrigin = process.env.APP_ORIGIN?.trim();
+      if (origin && ((allowedOrigin && origin !== allowedOrigin) || (!allowedOrigin && process.env.NODE_ENV === 'production'))) {
+        throw new HttpError(403, 'Cross-origin request rejected.');
+      }
+      if (origin && allowedOrigin && origin === allowedOrigin) {
+        response.setHeader('access-control-allow-origin', allowedOrigin);
+        response.setHeader('access-control-allow-credentials', 'true');
+        response.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
+        response.setHeader('access-control-allow-headers', 'Content-Type');
+        response.setHeader('vary', 'Origin');
+      }
       if (request.method === 'OPTIONS') {
+        if (!origin || !allowedOrigin || origin !== allowedOrigin) throw new HttpError(403, 'Preflight origin is not allowed.');
         response.writeHead(204, { 'cache-control': 'no-store' }); response.end(); return;
       }
       if (request.method === 'GET' && url.pathname === '/health') {
-        await pool.query('SELECT 1'); send(response, 200, { status: 'ok', service: 'cybersandbox-api' }); return;
+        const readiness = await pool.query(
+          'SELECT current_user AS runtime_role, (SELECT count(*)::int FROM schema_migrations) AS migration_count',
+        );
+        const runtimeRole = readiness.rows[0]?.runtime_role;
+        const migrationCount = Number(readiness.rows[0]?.migration_count ?? 0);
+        if (process.env.NODE_ENV === 'production' && runtimeRole !== 'cybersandbox_app') {
+          send(response, 503, { status: 'not_ready', reason: 'restricted_runtime_role_required' }); return;
+        }
+        if (migrationCount < 3) {
+          send(response, 503, { status: 'not_ready', reason: 'database_migrations_incomplete' }); return;
+        }
+        send(response, 200, { status: 'ok', service: 'cybersandbox-api', database: 'connected', migrations: migrationCount }); return;
       }
       if (request.method === 'POST' && url.pathname === '/api/invitations') return await createInstitutionInvitation(request,response);
       if (request.method === 'POST' && url.pathname === '/api/auth/accept-invitation') return await acceptInstitutionInvitation(request,response);
