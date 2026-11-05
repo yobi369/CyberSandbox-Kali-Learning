@@ -23,4 +23,6 @@ ALTER ROLE cybersandbox_app SET statement_timeout = '30s';
 DO $$ DECLARE r record; BEGIN
  SELECT rolsuper,rolcreatedb,rolcreaterole,rolbypassrls,rolinherit INTO r FROM pg_roles WHERE rolname='cybersandbox_app';
  IF r.rolsuper OR r.rolcreatedb OR r.rolcreaterole OR r.rolbypassrls OR r.rolinherit THEN RAISE EXCEPTION 'unsafe cybersandbox_app role attributes'; END IF;
-END $$;
+ IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_roles p ON p.oid=c.relowner WHERE p.rolname='cybersandbox_app' AND c.relnamespace='public'::regnamespace AND c.relkind IN ('r','p','S','v','m','f')) THEN RAISE EXCEPTION 'cybersandbox_app must not own database objects'; END IF;
+ IF EXISTS (SELECT 1 FROM pg_namespace n JOIN pg_roles p ON p.oid=n.nspowner WHERE p.rolname='cybersandbox_app' AND n.nspname='public') THEN RAISE EXCEPTION 'cybersandbox_app must not own the public schema'; END IF;
+END $;
