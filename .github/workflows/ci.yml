@@ -57,6 +57,12 @@ jobs:
       - name: Apply PostgreSQL migrations
         run: npm run db:migrate
 
+      - name: Provision restricted API runtime role
+        env:
+          MIGRATOR_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cybersandbox_test
+          CYBERSANDBOX_APP_PASSWORD: ci-only-runtime-password-with-at-least-32-characters
+        run: sh ops/postgres/apply-runtime-role.sh
+
       - name: Unit and PostgreSQL integration tests
         run: npm test
 
