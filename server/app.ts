@@ -91,7 +91,7 @@ async function requireSession(request: IncomingMessage): Promise<Session> {
   return session;
 }
 async function inTenant<T>(session: Session, operation: (client: import('pg').PoolClient) => Promise<T>): Promise<T> {
-  return inTenant(session, async (client) => {
+  return withInstitution(session.organizationId, async (client) => {
     const membership = await client.query(
       'SELECT 1 FROM memberships m JOIN organizations o ON o.id = m.organization_id WHERE m.user_id = $1 AND m.organization_id = $2 AND m.status = $3 AND o.status = $4',
       [session.userId, session.organizationId, 'active', 'active'],
