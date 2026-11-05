@@ -201,6 +201,7 @@ CREATE TABLE IF NOT EXISTS research_provenance (
   actor_user_id uuid NOT NULL,
   event_type text NOT NULL,
   payload jsonb NOT NULL,
+  sequence_no bigint NOT NULL CHECK (sequence_no > 0),
   previous_hash char(64),
   event_hash char(64) NOT NULL,
   occurred_at timestamptz NOT NULL DEFAULT now(),
@@ -208,7 +209,8 @@ CREATE TABLE IF NOT EXISTS research_provenance (
   FOREIGN KEY (organization_id, experiment_id) REFERENCES research_experiments(organization_id, id),
   FOREIGN KEY (organization_id, dataset_id) REFERENCES research_datasets(organization_id, id),
   FOREIGN KEY (actor_user_id, organization_id) REFERENCES memberships(user_id, organization_id),
-  UNIQUE (organization_id, id)
+  UNIQUE (organization_id, id),
+  UNIQUE (organization_id, project_id, sequence_no)
 );
 
 CREATE OR REPLACE FUNCTION reject_immutable_record_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -272,9 +274,9 @@ DECLARE expected_previous char(64);
 BEGIN
   SELECT event_hash INTO expected_previous FROM research_provenance
   WHERE organization_id = NEW.organization_id AND project_id = NEW.project_id
-  ORDER BY occurred_at DESC, id DESC LIMIT 1;
-  IF NEW.previous_hash IS DISTINCT FROM expected_previous THEN
-    RAISE EXCEPTION 'Research provenance chain does not extend the latest event';
+  ORDER BY sequence_no DESC LIMIT 1;
+  IF NEW.previous_hash IS DISTINCT FROM expected_previous OR NEW.sequence_no <> COALESCE((SELECT max(sequence_no) + 1 FROM research_provenance WHERE organization_id = NEW.organization_id AND project_id = NEW.project_id), 1) THEN
+    RAISE EXCEPTION 'Research provenance chain sequence or previous hash is invalid';
   END IF;
   RETURN NEW;
 END $;
