@@ -14,7 +14,7 @@ async function api<T=any>(path:string, init:RequestInit={}):Promise<T>{
   if(type.includes('text/csv'))return await response.text() as T;
   return response.status===204?undefined as T:response.json();
 }
-const post=(path:string,body:unknown)=>api(path,{method:'POST',body:JSON.stringify(body)});
+const post = <T = any,>(path: string, body: unknown) => api<T>(path, { method: 'POST', body: JSON.stringify(body) });
 const labels:Record<string,string>={courses:'Enrolled courses',due_assignments:'Assignments due',submissions:'Submissions',completed_lessons:'Lessons completed',cohorts:'Teaching cohorts',assignments:'Assignments',awaiting_review:'Awaiting review',students:'Students',lecturers:'Lecturers',published_courses:'Published courses',active_cohorts:'Active cohorts',pending_moderation:'Pending moderation'};
 
 export default function UniversityPortal({onOpenSimulator}:{onOpenSimulator:()=>void}){
