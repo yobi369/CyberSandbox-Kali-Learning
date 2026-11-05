@@ -835,7 +835,8 @@ async function resolveAppeal(request: IncomingMessage, response: ServerResponse,
 }
 
 function csvCell(value: unknown): string {
-  const text = value === null || value === undefined ? '' : String(value);
+  const raw = value === null || value === undefined ? '' : String(value);
+  const text = /^[\\s]*[=+@-]/.test(raw) ? "'" + raw : raw;
   return '"' + text.replace(/"/g, '""') + '"';
 }
 async function exportAcademicCsv(request: IncomingMessage, response: ServerResponse, kind: 'gradebook' | 'cohort_roster'): Promise<void> {
@@ -844,15 +845,19 @@ async function exportAcademicCsv(request: IncomingMessage, response: ServerRespo
   const csv = await inTenant(session, async (client) => {
     let rows: unknown[][];
     if (kind === 'gradebook') {
+      const lecturerScope = session.role === 'lecturer' ? ' AND EXISTS (SELECT 1 FROM cohort_staff cs WHERE cs.organization_id = a.organization_id AND cs.cohort_id = a.cohort_id AND cs.lecturer_user_id = $2)' : '';
+      const params = session.role === 'lecturer' ? [session.organizationId, session.userId] : [session.organizationId];
       const result = await client.query(
-        'SELECT c.code, h.name AS cohort, a.title AS assignment, u.email AS learner_email, u.display_name AS learner, gh.grade, gh.feedback, gh.recorded_at FROM grade_history gh JOIN submissions s ON s.id = gh.submission_id AND s.organization_id = gh.organization_id JOIN assignments a ON a.id = s.assignment_id AND a.organization_id = s.organization_id JOIN cohorts h ON h.id = a.cohort_id AND h.organization_id = a.organization_id JOIN courses c ON c.id = h.course_id AND c.organization_id = h.organization_id JOIN users u ON u.id = s.student_user_id WHERE gh.organization_id = $1 ORDER BY c.code, h.name, u.email, a.title',
-        [session.organizationId],
+        'SELECT c.code, h.name AS cohort, a.title AS assignment, u.email AS learner_email, u.display_name AS learner, gh.grade, gh.feedback, gh.recorded_at FROM grade_history gh JOIN submissions s ON s.id = gh.submission_id AND s.organization_id = gh.organization_id JOIN assignments a ON a.id = s.assignment_id AND a.organization_id = s.organization_id JOIN cohorts h ON h.id = a.cohort_id AND h.organization_id = a.organization_id JOIN courses c ON c.id = h.course_id AND c.organization_id = h.organization_id JOIN users u ON u.id = s.student_user_id WHERE gh.organization_id = $1' + lecturerScope + ' ORDER BY c.code, h.name, u.email, a.title',
+        params,
       );
       rows = [['course_code','cohort','assignment','learner_email','learner','grade','feedback','recorded_at'], ...result.rows.map((r) => [r.code,r.cohort,r.assignment,r.learner_email,r.learner,r.grade,r.feedback,r.recorded_at])];
     } else {
+      const lecturerScope = session.role === 'lecturer' ? ' AND EXISTS (SELECT 1 FROM cohort_staff cs WHERE cs.organization_id = h.organization_id AND cs.cohort_id = h.id AND cs.lecturer_user_id = $2)' : '';
+      const params = session.role === 'lecturer' ? [session.organizationId, session.userId] : [session.organizationId];
       const result = await client.query(
-        'SELECT c.code, h.name AS cohort, u.email, u.display_name, e.status, e.enrolled_at FROM enrollments e JOIN cohorts h ON h.id = e.cohort_id AND h.organization_id = e.organization_id JOIN courses c ON c.id = h.course_id AND c.organization_id = h.organization_id JOIN users u ON u.id = e.student_user_id WHERE e.organization_id = $1 ORDER BY c.code, h.name, u.email',
-        [session.organizationId],
+        'SELECT c.code, h.name AS cohort, u.email, u.display_name, e.status, e.enrolled_at FROM enrollments e JOIN cohorts h ON h.id = e.cohort_id AND h.organization_id = e.organization_id JOIN courses c ON c.id = h.course_id AND c.organization_id = h.organization_id JOIN users u ON u.id = e.student_user_id WHERE e.organization_id = $1' + lecturerScope + ' ORDER BY c.code, h.name, u.email',
+        params,
       );
       rows = [['course_code','cohort','email','learner','enrollment_status','enrolled_at'], ...result.rows.map((r) => [r.code,r.cohort,r.email,r.display_name,r.status,r.enrolled_at])];
     }
@@ -957,6 +962,33 @@ async function reviewResearchEthics(request: IncomingMessage, response: ServerRe
   send(response, 200, result);
 }
 
+
+async function getResearchProvenance(request: IncomingMessage, response: ServerResponse, projectId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['lecturer','institution_admin','platform_admin']);
+  requireUuid(projectId);
+  const result = await inTenant(session, async (client) => {
+    const project = await client.query('SELECT principal_investigator FROM research_projects WHERE organization_id = $1 AND id = $2', [session.organizationId,projectId]);
+    if (!project.rowCount) throw new HttpError(404, 'Research project not found.');
+    if (project.rows[0].principal_investigator !== session.userId && !['institution_admin','platform_admin'].includes(session.role)) throw new HttpError(403, 'Only the principal investigator or institution administrator can inspect provenance.');
+    const events = await client.query('SELECT rp.sequence_no, rp.actor_user_id, u.display_name AS actor, rp.event_type, rp.payload, rp.previous_hash, rp.event_hash, rp.occurred_at FROM research_provenance rp JOIN users u ON u.id = rp.actor_user_id WHERE rp.organization_id = $1 AND rp.project_id = $2 ORDER BY rp.sequence_no', [session.organizationId,projectId]);
+    let previousHash: string | null = null;
+    let expectedSequence = 1;
+    for (const event of events.rows) {
+      const occurredAt = new Date(event.occurred_at).toISOString();
+      const payloadJson = canonicalJson(event.payload);
+      const computed = createHash('sha256').update([previousHash ?? '',projectId,String(expectedSequence),event.actor_user_id,event.event_type,payloadJson,occurredAt].join('|')).digest('hex');
+      if (Number(event.sequence_no) !== expectedSequence || event.previous_hash !== previousHash || event.event_hash.trim() !== computed) {
+        throw new HttpError(409, 'Research provenance chain verification failed.');
+      }
+      previousHash = event.event_hash.trim();
+      expectedSequence += 1;
+    }
+    return { projectId, verified: true, eventCount: events.rowCount, headHash: previousHash, events: events.rows };
+  });
+  send(response,200,result);
+}
+
 async function createLabDefinition(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const session = await requireSession(request);
   requireRole(session, ['institution_admin','platform_admin']);
@@ -1055,6 +1087,8 @@ export function createApiServer() {
       const experimentMatch = url.pathname.match(/^\/api\/research\/workspaces\/([^/]+)\/experiments$/);
       if (request.method === 'POST' && experimentMatch) return await createResearchExperiment(request, response, decodeURIComponent(experimentMatch[1]));
 
+      const provenanceMatch = url.pathname.match(/^\/api\/research\/projects\/([^/]+)\/provenance$/);
+      if (request.method === 'GET' && provenanceMatch) return await getResearchProvenance(request,response,decodeURIComponent(provenanceMatch[1]));
       const ethicsReviewMatch = url.pathname.match(/^\/api\/research\/projects\/([^/]+)\/ethics-review$/);
       if (request.method === 'POST' && ethicsReviewMatch) return await reviewResearchEthics(request, response, decodeURIComponent(ethicsReviewMatch[1]));
       if (request.method === 'POST' && url.pathname === '/api/labs/definitions') return await createLabDefinition(request, response);
