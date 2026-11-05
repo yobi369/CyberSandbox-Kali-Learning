@@ -227,7 +227,7 @@ CREATE TRIGGER research_provenance_immutable BEFORE UPDATE OR DELETE ON research
 FOR EACH ROW EXECUTE FUNCTION reject_immutable_record_mutation();
 
 
-CREATE OR REPLACE FUNCTION reject_published_curriculum_mutation() RETURNS trigger LANGUAGE plpgsql AS $
+CREATE OR REPLACE FUNCTION reject_published_curriculum_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
   version_id uuid;
   published timestamptz;
@@ -255,7 +255,7 @@ BEGIN
   SELECT published_at INTO published FROM course_versions WHERE id = version_id;
   IF published IS NOT NULL THEN RAISE EXCEPTION 'Published learning pathways are immutable'; END IF;
   IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
-END $;
+END $$;
 
 DROP TRIGGER IF EXISTS course_versions_immutable ON course_versions;
 CREATE TRIGGER course_versions_immutable BEFORE INSERT OR UPDATE OR DELETE ON course_versions
@@ -271,7 +271,7 @@ CREATE TRIGGER lesson_prerequisites_immutable BEFORE INSERT OR UPDATE OR DELETE 
 FOR EACH ROW EXECUTE FUNCTION reject_published_curriculum_mutation();
 
 
-CREATE OR REPLACE FUNCTION enforce_academic_membership_role() RETURNS trigger LANGUAGE plpgsql AS $
+CREATE OR REPLACE FUNCTION enforce_academic_membership_role() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE target_user uuid;
 DECLARE target_role text;
 DECLARE allowed_roles text[];
@@ -333,9 +333,9 @@ BEGIN
     ) THEN RAISE EXCEPTION 'Submission requires an active enrolment in the published assignment cohort'; END IF;
   END IF;
   RETURN NEW;
-END $;
+END $$;
 
-CREATE OR REPLACE FUNCTION verify_research_provenance_link() RETURNS trigger LANGUAGE plpgsql AS $
+CREATE OR REPLACE FUNCTION verify_research_provenance_link() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE expected_previous char(64);
 BEGIN
   SELECT event_hash INTO expected_previous FROM research_provenance
@@ -345,13 +345,13 @@ BEGIN
     RAISE EXCEPTION 'Research provenance chain sequence or previous hash is invalid';
   END IF;
   RETURN NEW;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS research_provenance_chain ON research_provenance;
 CREATE TRIGGER research_provenance_chain BEFORE INSERT ON research_provenance
 FOR EACH ROW EXECUTE FUNCTION verify_research_provenance_link();
 
 
-DO $
+DO $$
 DECLARE table_name text;
 BEGIN
   FOREACH table_name IN ARRAY ARRAY[
@@ -364,9 +364,9 @@ BEGIN
     EXECUTE format('DROP TRIGGER IF EXISTS academic_membership_role ON %I', table_name);
     EXECUTE format('CREATE TRIGGER academic_membership_role BEFORE INSERT OR UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION enforce_academic_membership_role()', table_name);
   END LOOP;
-END $;
+END $$;
 
-CREATE OR REPLACE FUNCTION require_moderated_grade() RETURNS trigger LANGUAGE plpgsql AS $
+CREATE OR REPLACE FUNCTION require_moderated_grade() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM assessments a
@@ -375,12 +375,12 @@ BEGIN
       AND a.score = NEW.grade
   ) THEN RAISE EXCEPTION 'Grade history requires a matching moderated assessment'; END IF;
   RETURN NEW;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS grade_history_moderated_only ON grade_history;
 CREATE TRIGGER grade_history_moderated_only BEFORE INSERT ON grade_history
 FOR EACH ROW EXECUTE FUNCTION require_moderated_grade();
 
-DO $
+DO $$
 DECLARE table_name text;
 BEGIN
   FOREACH table_name IN ARRAY ARRAY[
