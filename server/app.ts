@@ -919,7 +919,8 @@ async function createResearchExperiment(request: IncomingMessage, response: Serv
   const protocol = body.protocol && typeof body.protocol === 'object' && !Array.isArray(body.protocol) ? JSON.stringify(body.protocol) : '{}';
   const revision = requireValue(body.codeRevision, 'source revision', 120);
   const digest = requireValue(body.environmentDigest, 'environment digest', 160);
-  if (!/^[a-f0-9]{7,64}$/i.test(revision) || !/^(sha256:)?[a-f0-9]{64}$/i.test(digest) || protocol.length > 20000) throw new HttpError(400, 'Provide a source commit and immutable environment digest.');
+  const lockDigest = requireValue(body.dependencyLockDigest, 'dependency lockfile digest', 80);
+  if (!/^[a-f0-9]{40}$/i.test(revision) || !/^(sha256:)?[a-f0-9]{64}$/i.test(digest) || !/^sha256:[a-f0-9]{64}$/i.test(lockDigest) || protocol.length > 20000) throw new HttpError(400, 'Provide a source commit and immutable environment digest.');
   const seed = Number(body.randomSeed);
   if (!Number.isSafeInteger(seed) || seed < 0) throw new HttpError(400, 'A non-negative reproducibility seed is required.');
   const result = await inTenant(session, async (client) => {
@@ -927,8 +928,8 @@ async function createResearchExperiment(request: IncomingMessage, response: Serv
     if (!workspace.rowCount) throw new HttpError(404, 'Research workspace not found.');
     if (workspace.rows[0].owner_user_id !== session.userId && !['institution_admin','platform_admin'].includes(session.role)) throw new HttpError(403, 'Only the workspace owner or institution administrator can register experiments.');
     if (!['approved','not_required'].includes(workspace.rows[0].ethics_status)) throw new HttpError(409, 'Research ethics approval is required.');
-    const experiment = await client.query("INSERT INTO research_experiments (organization_id, workspace_id, created_by, title, hypothesis, protocol, code_revision, environment_digest, random_seed, status) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,'queued') RETURNING id, status", [session.organizationId,workspaceId,session.userId,title,hypothesis,protocol,revision,digest,seed]);
-    await appendResearchProvenance(client, session, workspace.rows[0].project_id, 'experiment.registered', { experimentId: experiment.rows[0].id, title, hypothesis, protocol: JSON.parse(protocol), codeRevision: revision, environmentDigest: digest, randomSeed: seed }, experiment.rows[0].id);
+    const experiment = await client.query("INSERT INTO research_experiments (organization_id, workspace_id, created_by, title, hypothesis, protocol, code_revision, environment_digest, dependency_lock_digest, random_seed, status) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,'queued') RETURNING id, status", [session.organizationId,workspaceId,session.userId,title,hypothesis,protocol,revision,digest,lockDigest,seed]);
+    await appendResearchProvenance(client, session, workspace.rows[0].project_id, 'experiment.registered', { experimentId: experiment.rows[0].id, title, hypothesis, protocol: JSON.parse(protocol), codeRevision: revision, environmentDigest: digest, dependencyLockDigest: lockDigest, randomSeed: seed }, experiment.rows[0].id);
     await recordAudit(client, session, 'research.experiment_registered', 'research_experiment', experiment.rows[0].id);
     return { ...experiment.rows[0], executionAvailable: false, message: 'Experiment provenance is registered; no execution worker is connected.' };
   });
