@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 import { pool, withInstitution } from './database.js';
-import { createSessionToken, hashSessionToken, parseCookies, verifyPassword } from './security.js';
+import { createSessionToken, hashPassword, hashSessionToken, parseCookies, verifyPassword } from './security.js';
 
 const SESSION_COOKIE = 'cybersandbox_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
@@ -139,6 +139,95 @@ async function lecturerCanAccessCohort(client: import('pg').PoolClient, session:
     [session.organizationId, cohortId, session.userId],
   );
   return result.rowCount > 0;
+}
+
+
+async function createInstitutionInvitation(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['institution_admin','platform_admin']);
+  const body = await readJson(request);
+  const email = requireValue(body.email, 'institutional email', 254).toLowerCase();
+  const role = body.role;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['student','lecturer'].includes(String(role))) {
+    throw new HttpError(400, 'Provide a valid email and a student or lecturer role.');
+  }
+  const token = createSessionToken();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const result = await inTenant(session, async (client) => {
+    const existing = await client.query(
+      'SELECT m.status FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.organization_id = $1 AND lower(u.email) = $2',
+      [session.organizationId,email],
+    );
+    if (existing.rows.some((row) => ['active','suspended'].includes(row.status))) {
+      throw new HttpError(409, 'This email already has an active or suspended institution membership.');
+    }
+    await client.query(
+      'UPDATE course_invitations SET revoked_at = now() WHERE organization_id = $1 AND lower(email) = $2 AND accepted_at IS NULL AND revoked_at IS NULL',
+      [session.organizationId,email],
+    );
+    const invitation = await client.query(
+      'INSERT INTO course_invitations (organization_id,email,role,token_hash,invited_by,expires_at) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,expires_at',
+      [session.organizationId,email,role,hashSessionToken(token),session.userId,expiresAt],
+    );
+    await recordAudit(client,session,'institution.invitation_created','invitation',invitation.rows[0].id);
+    return invitation.rows[0];
+  });
+  const path = '/?institution=' + encodeURIComponent(session.organizationSlug) + '&invite=' + encodeURIComponent(token);
+  const invitationUrl = process.env.APP_ORIGIN ? new URL(path,process.env.APP_ORIGIN).toString() : path;
+  send(response,201,{ email,role,expiresAt:result.expires_at,invitationUrl,invitationToken:token,delivery:'manual-link' });
+}
+
+async function acceptInstitutionInvitation(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const body = await readJson(request);
+  const token = requireValue(body.token,'invitation token',128);
+  const institutionSlug = requireValue(body.institutionSlug,'institution code',64).toLowerCase();
+  const displayName = requireValue(body.displayName,'display name',160);
+  const password = requireValue(body.password,'password',1024);
+  if (token.length < 32 || password.length < 12 || !/^[a-z0-9][a-z0-9-]{1,62}$/.test(institutionSlug)) {
+    throw new HttpError(400,'Invalid invitation details or password length.');
+  }
+  const organization = await pool.query('SELECT id,name,slug FROM organizations WHERE slug = $1 AND status = $2',[institutionSlug,'active']);
+  if (!organization.rowCount) throw new HttpError(404,'The invitation could not be verified.');
+  const passwordHash = await hashPassword(password);
+  const sessionToken = createSessionToken();
+  const result = await withInstitution(organization.rows[0].id,async(client)=>{
+    const invitation = await client.query(
+      'SELECT id,email,role,invited_by FROM course_invitations WHERE organization_id = $1 AND token_hash = $2 AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > now() FOR UPDATE',
+      [organization.rows[0].id,hashSessionToken(token)],
+    );
+    if (!invitation.rowCount) throw new HttpError(404,'The invitation is invalid, expired, revoked or already used.');
+    const email = invitation.rows[0].email;
+    const existing = await client.query('SELECT id,email,display_name,password_hash,status FROM users WHERE lower(email) = $1 FOR UPDATE',[email]);
+    let userId: string;
+    let userName: string;
+    if (existing.rowCount) {
+      const user = existing.rows[0];
+      if (user.status !== 'active' || !await verifyPassword(password,user.password_hash)) throw new HttpError(401,'The existing account could not be verified.');
+      userId = user.id;
+      userName = user.display_name;
+    } else {
+      const created = await client.query('INSERT INTO users (email,display_name,password_hash) VALUES ($1,$2,$3) RETURNING id,display_name',[email,displayName,passwordHash]);
+      userId = created.rows[0].id;
+      userName = created.rows[0].display_name;
+    }
+    const membership = await client.query('SELECT status FROM memberships WHERE user_id = $1 AND organization_id = $2',[userId,organization.rows[0].id]);
+    if (membership.rows[0]?.status === 'active' || membership.rows[0]?.status === 'suspended') throw new HttpError(409,'This account already has an active or suspended membership.');
+    await client.query(
+      'INSERT INTO memberships (user_id,organization_id,role,status) VALUES ($1,$2,$3,$4) ON CONFLICT (user_id,organization_id) DO UPDATE SET role = EXCLUDED.role,status = EXCLUDED.status',
+      [userId,organization.rows[0].id,invitation.rows[0].role,'active'],
+    );
+    await client.query('UPDATE course_invitations SET accepted_at = now() WHERE organization_id = $1 AND id = $2',[organization.rows[0].id,invitation.rows[0].id]);
+    await client.query('INSERT INTO sessions (token_hash,user_id,organization_id,expires_at) VALUES ($1,$2,$3,now() + ($4 * interval \'1 second\'))',[hashSessionToken(sessionToken),userId,organization.rows[0].id,SESSION_TTL_SECONDS]);
+    const acceptedSession: Session = {
+      userId,email,displayName:userName,organizationId:organization.rows[0].id,
+      organizationName:organization.rows[0].name,organizationSlug:organization.rows[0].slug,
+      role:invitation.rows[0].role,expiresAt:new Date(Date.now()+SESSION_TTL_SECONDS*1000).toISOString(),
+    };
+    await recordAudit(client,acceptedSession,'institution.invitation_accepted','invitation',invitation.rows[0].id);
+    return { user:{id:userId,email,displayName:userName},institution:{id:acceptedSession.organizationId,name:acceptedSession.organizationName,slug:acceptedSession.organizationSlug},role:acceptedSession.role };
+  });
+  setSessionCookie(response,sessionToken);
+  send(response,201,result);
 }
 
 async function login(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -1048,6 +1137,8 @@ export function createApiServer() {
       if (request.method === 'GET' && url.pathname === '/health') {
         await pool.query('SELECT 1'); send(response, 200, { status: 'ok', service: 'cybersandbox-api' }); return;
       }
+      if (request.method === 'POST' && url.pathname === '/api/invitations') return await createInstitutionInvitation(request,response);
+      if (request.method === 'POST' && url.pathname === '/api/auth/accept-invitation') return await acceptInstitutionInvitation(request,response);
       if (request.method === 'POST' && url.pathname === '/api/auth/login') return await login(request, response);
       if (request.method === 'GET' && url.pathname === '/api/auth/session') return await currentSession(request, response);
       if (request.method === 'POST' && url.pathname === '/api/auth/logout') return await logout(request, response);
