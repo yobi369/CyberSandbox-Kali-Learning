@@ -1,4 +1,5 @@
 import path from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -11,6 +12,16 @@ export default defineConfig(() => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        proxy: {
+          '/api': {
+            target: process.env.CYBERSANDBOX_API_TARGET ?? 'http://localhost:4000',
+            changeOrigin: false,
+          },
+          '/health': {
+            target: process.env.CYBERSANDBOX_API_TARGET ?? 'http://localhost:4000',
+            changeOrigin: false,
+          },
+        },
       },
       plugins: [react(), tailwindcss()],
       resolve: {
