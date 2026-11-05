@@ -897,8 +897,9 @@ async function createResearchWorkspace(request: IncomingMessage, response: Serve
   }
   if (spec.length > 10000 || quota.length > 2000) throw new HttpError(400, 'Workspace configuration is too large.');
   const workspace = await inTenant(session, async (client) => {
-    const project = await client.query('SELECT id, ethics_status FROM research_projects WHERE organization_id = $1 AND id = $2', [session.organizationId, projectId]);
+    const project = await client.query('SELECT id, ethics_status, principal_investigator FROM research_projects WHERE organization_id = $1 AND id = $2', [session.organizationId, projectId]);
     if (!project.rowCount) throw new HttpError(404, 'Research project not found.');
+    if (project.rows[0].principal_investigator !== session.userId && !['institution_admin','platform_admin'].includes(session.role)) throw new HttpError(403, 'Only the principal investigator or institution administrator can create this workspace.');
     if (!['approved','not_required'].includes(project.rows[0].ethics_status)) throw new HttpError(409, 'Research ethics approval is required before provisioning a workspace.');
     const result = await client.query("INSERT INTO research_workspaces (organization_id, project_id, owner_user_id, environment_spec, resource_quota, state) VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,'stopped') RETURNING id, state", [session.organizationId,projectId,session.userId,spec,quota]);
     await appendResearchProvenance(client, session, projectId, 'workspace.created', { workspaceId: result.rows[0].id, environmentSpec: JSON.parse(spec), resourceQuota: JSON.parse(quota) });
@@ -922,8 +923,9 @@ async function createResearchExperiment(request: IncomingMessage, response: Serv
   const seed = Number(body.randomSeed);
   if (!Number.isSafeInteger(seed) || seed < 0) throw new HttpError(400, 'A non-negative reproducibility seed is required.');
   const result = await inTenant(session, async (client) => {
-    const workspace = await client.query('SELECT w.id, w.project_id, w.state, p.ethics_status FROM research_workspaces w JOIN research_projects p ON p.id = w.project_id AND p.organization_id = w.organization_id WHERE w.organization_id = $1 AND w.id = $2', [session.organizationId,workspaceId]);
+    const workspace = await client.query('SELECT w.id, w.project_id, w.state, w.owner_user_id, p.ethics_status FROM research_workspaces w JOIN research_projects p ON p.id = w.project_id AND p.organization_id = w.organization_id WHERE w.organization_id = $1 AND w.id = $2', [session.organizationId,workspaceId]);
     if (!workspace.rowCount) throw new HttpError(404, 'Research workspace not found.');
+    if (workspace.rows[0].owner_user_id !== session.userId && !['institution_admin','platform_admin'].includes(session.role)) throw new HttpError(403, 'Only the workspace owner or institution administrator can register experiments.');
     if (!['approved','not_required'].includes(workspace.rows[0].ethics_status)) throw new HttpError(409, 'Research ethics approval is required.');
     const experiment = await client.query("INSERT INTO research_experiments (organization_id, workspace_id, created_by, title, hypothesis, protocol, code_revision, environment_digest, random_seed, status) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,'queued') RETURNING id, status", [session.organizationId,workspaceId,session.userId,title,hypothesis,protocol,revision,digest,seed]);
     await appendResearchProvenance(client, session, workspace.rows[0].project_id, 'experiment.registered', { experimentId: experiment.rows[0].id, title, hypothesis, protocol: JSON.parse(protocol), codeRevision: revision, environmentDigest: digest, randomSeed: seed }, experiment.rows[0].id);
