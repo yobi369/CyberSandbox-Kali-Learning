@@ -106,6 +106,31 @@ async function recordAudit(client: import('pg').PoolClient, session: Session, ac
     [session.organizationId, session.userId, action, resourceType, resourceId, 'success'],
   );
 }
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']';
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return '{' + Object.keys(record).sort().map((key) => JSON.stringify(key) + ':' + canonicalJson(record[key])).join(',') + '}';
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+async function appendResearchProvenance(
+  client: import('pg').PoolClient, session: Session, projectId: string,
+  eventType: string, payload: unknown, experimentId: string | null = null, datasetId: string | null = null,
+): Promise<void> {
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [projectId]);
+  const previous = await client.query('SELECT event_hash FROM research_provenance WHERE organization_id = $1 AND project_id = $2 ORDER BY occurred_at DESC, id DESC LIMIT 1', [session.organizationId, projectId]);
+  const previousHash = previous.rows[0]?.event_hash ?? null;
+  const payloadJson = canonicalJson(payload);
+  const occurredAt = new Date().toISOString();
+  const eventHash = createHash('sha256').update([previousHash ?? '', projectId, session.userId, eventType, payloadJson, occurredAt].join('|')).digest('hex');
+  await client.query(
+    'INSERT INTO research_provenance (organization_id, project_id, experiment_id, dataset_id, actor_user_id, event_type, payload, previous_hash, event_hash, occurred_at) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10)',
+    [session.organizationId,projectId,experimentId,datasetId,session.userId,eventType,payloadJson,previousHash,eventHash,occurredAt],
+  );
+}
+
 async function lecturerCanAccessCohort(client: import('pg').PoolClient, session: Session, cohortId: string): Promise<boolean> {
   if (session.role === 'institution_admin' || session.role === 'platform_admin') return true;
   const result = await client.query(
@@ -795,10 +820,10 @@ async function createResearchProject(request: IncomingMessage, response: ServerR
   const abstract = typeof body.abstract === 'string' ? body.abstract.slice(0, 10000) : '';
   const methodology = body.methodology && typeof body.methodology === 'object' && !Array.isArray(body.methodology) ? JSON.stringify(body.methodology) : '{}';
   if (methodology.length > 20000) throw new HttpError(400, 'Methodology specification is too large.');
-  const ethics = body.ethicsStatus ?? 'pending';
-  if (!['pending', 'approved', 'not_required'].includes(String(ethics))) throw new HttpError(400, 'Invalid ethics status.');
+  const ethics = 'pending';
   const project = await inTenant(session, async (client) => {
     const result = await client.query('INSERT INTO research_projects (organization_id, title, abstract, research_question, methodology, ethics_status, principal_investigator) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7) RETURNING id, status, ethics_status', [session.organizationId,title,abstract,question,methodology,ethics,session.userId]);
+    await appendResearchProvenance(client, session, result.rows[0].id, 'project.created', { title, researchQuestion: question, methodology: JSON.parse(methodology) });
     await recordAudit(client, session, 'research.project_created', 'research_project', result.rows[0].id);
     return result.rows[0];
   });
@@ -818,6 +843,7 @@ async function createResearchWorkspace(request: IncomingMessage, response: Serve
     if (!project.rowCount) throw new HttpError(404, 'Research project not found.');
     if (!['approved','not_required'].includes(project.rows[0].ethics_status)) throw new HttpError(409, 'Research ethics approval is required before provisioning a workspace.');
     const result = await client.query("INSERT INTO research_workspaces (organization_id, project_id, owner_user_id, environment_spec, resource_quota, state) VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,'stopped') RETURNING id, state", [session.organizationId,projectId,session.userId,spec,quota]);
+    await appendResearchProvenance(client, session, projectId, 'workspace.created', { workspaceId: result.rows[0].id, environmentSpec: JSON.parse(spec), resourceQuota: JSON.parse(quota) });
     await recordAudit(client, session, 'research.workspace_created', 'research_workspace', result.rows[0].id);
     return { ...result.rows[0], executionAvailable: false, message: 'Workspace metadata is provisioned; no compute worker is connected.' };
   });
@@ -842,10 +868,66 @@ async function createResearchExperiment(request: IncomingMessage, response: Serv
     if (!workspace.rowCount) throw new HttpError(404, 'Research workspace not found.');
     if (!['approved','not_required'].includes(workspace.rows[0].ethics_status)) throw new HttpError(409, 'Research ethics approval is required.');
     const experiment = await client.query("INSERT INTO research_experiments (organization_id, workspace_id, created_by, title, hypothesis, protocol, code_revision, environment_digest, random_seed, status) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,'queued') RETURNING id, status", [session.organizationId,workspaceId,session.userId,title,hypothesis,protocol,revision,digest,seed]);
+    await appendResearchProvenance(client, session, workspace.rows[0].project_id, 'experiment.registered', { experimentId: experiment.rows[0].id, title, hypothesis, protocol: JSON.parse(protocol), codeRevision: revision, environmentDigest: digest, randomSeed: seed }, experiment.rows[0].id);
     await recordAudit(client, session, 'research.experiment_registered', 'research_experiment', experiment.rows[0].id);
     return { ...experiment.rows[0], executionAvailable: false, message: 'Experiment provenance is registered; no execution worker is connected.' };
   });
   send(response, 201, result);
+}
+
+
+async function reviewResearchEthics(request: IncomingMessage, response: ServerResponse, projectId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['institution_admin', 'platform_admin']);
+  requireUuid(projectId);
+  const body = await readJson(request);
+  const decision = body.decision;
+  if (!['approved','rejected','not_required'].includes(String(decision))) throw new HttpError(400, 'Invalid ethics decision.');
+  const reference = requireValue(body.reference, 'ethics review reference', 240);
+  const rationale = requireValue(body.rationale, 'ethics review rationale', 30,);
+  const result = await inTenant(session, async (client) => {
+    const project = await client.query("UPDATE research_projects SET ethics_status = $1, ethics_reference = $2, ethics_reviewed_by = $3, ethics_reviewed_at = now() WHERE organization_id = $4 AND id = $5 AND ethics_status = 'pending' RETURNING id", [decision,reference,session.userId,session.organizationId,projectId]);
+    if (!project.rowCount) throw new HttpError(404, 'Pending research project not found.');
+    await appendResearchProvenance(client, session, projectId, 'ethics.reviewed', { decision, reference, rationale });
+    await recordAudit(client, session, 'research.ethics_' + String(decision), 'research_project', projectId);
+    return { projectId, ethicsStatus: decision };
+  });
+  send(response, 200, result);
+}
+
+async function createLabDefinition(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['institution_admin','platform_admin']);
+  const body = await readJson(request);
+  const slug = requireValue(body.slug, 'lab slug', 80).toLowerCase();
+  const title = requireValue(body.title, 'lab title', 180);
+  const description = typeof body.description === 'string' ? body.description.slice(0, 4000) : '';
+  const digest = requireValue(body.imageDigest, 'immutable image digest', 80);
+  const mode = body.targetMode;
+  const policy = body.policy && typeof body.policy === 'object' && !Array.isArray(body.policy) ? JSON.stringify(body.policy) : '{}';
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !/^sha256:[a-f0-9]{64}$/.test(digest) || !['guided','isolated_kali','research'].includes(String(mode)) || policy.length > 10000) throw new HttpError(400, 'Invalid lab definition.');
+  const parsed = JSON.parse(policy) as Record<string, unknown>;
+  const egress = parsed.egress as Record<string, unknown> | undefined;
+  if (!egress || egress.default !== 'deny' || parsed.hostMounts !== false || parsed.privileged !== false) throw new HttpError(400, 'Lab policy must explicitly deny egress, host mounts and privileged execution.');
+  const result = await inTenant(session, async (client) => {
+    const lab = await client.query("INSERT INTO lab_definitions (organization_id, slug, title, description, image_digest, target_mode, policy, version, status) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,1,'draft') RETURNING id, status", [session.organizationId,slug,title,description,digest,mode,policy]);
+    await recordAudit(client, session, 'lab_definition.created', 'lab_definition', lab.rows[0].id);
+    return lab.rows[0];
+  });
+  send(response, 201, result);
+}
+
+async function approveLabDefinition(request: IncomingMessage, response: ServerResponse, labId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['institution_admin','platform_admin']);
+  requireUuid(labId);
+  const result = await inTenant(session, async (client) => {
+    const lab = await client.query("UPDATE lab_definitions SET status = 'approved', approved_by = $1, approved_at = now() WHERE organization_id = $2 AND id = $3 AND status = 'draft' RETURNING id, status", [session.userId,session.organizationId,labId]);
+    if (!lab.rowCount) throw new HttpError(404, 'Draft lab definition not found.');
+    await recordAudit(client, session, 'lab_definition.approved', 'lab_definition', labId);
+    return lab.rows[0];
+  });
+  send(response, 200, result);
 }
 
 async function requestLabSession(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -904,6 +986,12 @@ export function createApiServer() {
       if (request.method === 'POST' && researchWorkspaceMatch) return await createResearchWorkspace(request, response, decodeURIComponent(researchWorkspaceMatch[1]));
       const experimentMatch = url.pathname.match(/^\/api\/research\/workspaces\/([^/]+)\/experiments$/);
       if (request.method === 'POST' && experimentMatch) return await createResearchExperiment(request, response, decodeURIComponent(experimentMatch[1]));
+
+      const ethicsReviewMatch = url.pathname.match(/^\/api\/research\/projects\/([^/]+)\/ethics-review$/);
+      if (request.method === 'POST' && ethicsReviewMatch) return await reviewResearchEthics(request, response, decodeURIComponent(ethicsReviewMatch[1]));
+      if (request.method === 'POST' && url.pathname === '/api/labs/definitions') return await createLabDefinition(request, response);
+      const approveLabMatch = url.pathname.match(/^\/api\/labs\/definitions\/([^/]+)\/approve$/);
+      if (request.method === 'POST' && approveLabMatch) return await approveLabDefinition(request, response, decodeURIComponent(approveLabMatch[1]));
       if (request.method === 'POST' && url.pathname === '/api/labs/sessions') return await requestLabSession(request, response);
       if (request.method === 'GET' && url.pathname === '/api/dashboard') return await dashboard(request, response);
       if (request.method === 'GET' && url.pathname === '/api/courses') return await listCourses(request, response);
