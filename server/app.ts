@@ -640,7 +640,7 @@ async function exportAcademicCsv(request: IncomingMessage, response: ServerRespo
   const session = await requireSession(request);
   requireRole(session, ['lecturer', 'institution_admin', 'platform_admin']);
   const csv = await inTenant(session, async (client) => {
-    let rows;
+    let rows: unknown[][];
     if (kind === 'gradebook') {
       const result = await client.query(
         'SELECT c.code, h.name AS cohort, a.title AS assignment, u.email AS learner_email, u.display_name AS learner, gh.grade, gh.feedback, gh.recorded_at FROM grade_history gh JOIN submissions s ON s.id = gh.submission_id AND s.organization_id = gh.organization_id JOIN assignments a ON a.id = s.assignment_id AND a.organization_id = s.organization_id JOIN cohorts h ON h.id = a.cohort_id AND h.organization_id = a.organization_id JOIN courses c ON c.id = h.course_id AND c.organization_id = h.organization_id JOIN users u ON u.id = s.student_user_id WHERE gh.organization_id = $1 ORDER BY c.code, h.name, u.email, a.title',
