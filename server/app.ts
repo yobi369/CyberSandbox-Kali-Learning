@@ -478,6 +478,73 @@ async function publishCourse(request: IncomingMessage, response: ServerResponse,
   send(response, 200, published);
 }
 
+
+async function createCourseModule(request: IncomingMessage, response: ServerResponse, courseId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['institution_admin', 'platform_admin']);
+  requireUuid(courseId);
+  const body = await readJson(request);
+  const slug = requireValue(body.slug, 'module slug', 80).toLowerCase();
+  const title = requireValue(body.title, 'module title', 180);
+  const sequence = Number(body.sequence);
+  const outcomes = Array.isArray(body.learningOutcomes) ? body.learningOutcomes : [];
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !Number.isInteger(sequence) || sequence < 1 || sequence > 200 || outcomes.length > 30 || outcomes.some((x) => typeof x !== 'string' || !x.trim() || x.length > 500)) throw new HttpError(400, 'Invalid module slug, sequence, or learning outcomes.');
+  const result = await inTenant(session, async (client) => {
+    const version = await client.query('SELECT id FROM course_versions WHERE organization_id = $1 AND course_id = $2 AND published_at IS NULL ORDER BY version DESC LIMIT 1', [session.organizationId, courseId]);
+    if (!version.rowCount) throw new HttpError(404, 'An unpublished course version was not found.');
+    const module = await client.query('INSERT INTO learning_modules (organization_id, course_version_id, slug, title, sequence, learning_outcomes) VALUES ($1,$2,$3,$4,$5,$6::jsonb) RETURNING id', [session.organizationId,version.rows[0].id,slug,title,sequence,JSON.stringify(outcomes)]);
+    await recordAudit(client, session, 'course.module_created', 'learning_module', module.rows[0].id);
+    return { moduleId: module.rows[0].id };
+  });
+  send(response, 201, result);
+}
+
+async function createModuleLesson(request: IncomingMessage, response: ServerResponse, moduleId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['institution_admin', 'platform_admin']);
+  requireUuid(moduleId);
+  const body = await readJson(request);
+  const slug = requireValue(body.slug, 'lesson slug', 80).toLowerCase();
+  const title = requireValue(body.title, 'lesson title', 180);
+  const sequence = Number(body.sequence);
+  const estimatedMinutes = Number(body.estimatedMinutes ?? 30);
+  const content = body.content && typeof body.content === 'object' && !Array.isArray(body.content) ? JSON.stringify(body.content) : '';
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !Number.isInteger(sequence) || sequence < 1 || sequence > 500 || !Number.isInteger(estimatedMinutes) || estimatedMinutes < 1 || estimatedMinutes > 600 || !content || content.length > 50000) throw new HttpError(400, 'Invalid lesson content, slug, sequence, or duration.');
+  const result = await inTenant(session, async (client) => {
+    const module = await client.query('SELECT m.id FROM learning_modules m JOIN course_versions cv ON cv.id = m.course_version_id AND cv.organization_id = m.organization_id WHERE m.organization_id = $1 AND m.id = $2 AND cv.published_at IS NULL', [session.organizationId,moduleId]);
+    if (!module.rowCount) throw new HttpError(404, 'An editable course module was not found.');
+    const lesson = await client.query('INSERT INTO learning_lessons (organization_id, module_id, slug, title, sequence, content, estimated_minutes) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7) RETURNING id', [session.organizationId,moduleId,slug,title,sequence,content,estimatedMinutes]);
+    await recordAudit(client, session, 'course.lesson_created', 'learning_lesson', lesson.rows[0].id);
+    return { lessonId: lesson.rows[0].id };
+  });
+  send(response, 201, result);
+}
+
+async function addLessonPrerequisite(request: IncomingMessage, response: ServerResponse, lessonId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['institution_admin', 'platform_admin']);
+  requireUuid(lessonId);
+  const body = await readJson(request);
+  const prerequisiteId = requireUuid(requireValue(body.prerequisiteLessonId, 'prerequisite lesson identifier', 64));
+  if (prerequisiteId === lessonId) throw new HttpError(400, 'A lesson cannot be its own prerequisite.');
+  const result = await inTenant(session, async (client) => {
+    const sameVersion = await client.query(
+      'SELECT 1 FROM learning_lessons l JOIN learning_modules lm ON lm.id = l.module_id AND lm.organization_id = l.organization_id JOIN learning_lessons p ON p.id = $3 AND p.organization_id = l.organization_id JOIN learning_modules pm ON pm.id = p.module_id AND pm.organization_id = p.organization_id WHERE l.organization_id = $1 AND l.id = $2 AND lm.course_version_id = pm.course_version_id',
+      [session.organizationId,lessonId,prerequisiteId],
+    );
+    if (!sameVersion.rowCount) throw new HttpError(400, 'Prerequisites must belong to the same course version.');
+    const cycle = await client.query(
+      'WITH RECURSIVE ancestors(id) AS (SELECT prerequisite_lesson_id FROM lesson_prerequisites WHERE organization_id = $1 AND lesson_id = $2 UNION SELECT lp.prerequisite_lesson_id FROM lesson_prerequisites lp JOIN ancestors a ON lp.lesson_id = a.id WHERE lp.organization_id = $1) SELECT 1 FROM ancestors WHERE id = $3 LIMIT 1',
+      [session.organizationId,prerequisiteId,lessonId],
+    );
+    if (cycle.rowCount) throw new HttpError(409, 'This prerequisite would create a learning-path cycle.');
+    await client.query('INSERT INTO lesson_prerequisites (organization_id, lesson_id, prerequisite_lesson_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [session.organizationId,lessonId,prerequisiteId]);
+    await recordAudit(client, session, 'course.prerequisite_added', 'learning_lesson', lessonId);
+    return { lessonId, prerequisiteLessonId: prerequisiteId };
+  });
+  send(response, 200, result);
+}
+
 async function createCohort(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const session = await requireSession(request);
   requireRole(session, ['institution_admin', 'platform_admin']);
@@ -753,6 +820,13 @@ export function createApiServer() {
       if (request.method === 'POST' && url.pathname === '/api/courses') return await createCourse(request, response);
       const publishCourseMatch = url.pathname.match(/^\/api\/courses\/([^/]+)\/publish$/);
       if (request.method === 'POST' && publishCourseMatch) return await publishCourse(request, response, decodeURIComponent(publishCourseMatch[1]));
+
+      const modulesMatch = url.pathname.match(/^\/api\/courses\/([^/]+)\/modules$/);
+      if (request.method === 'POST' && modulesMatch) return await createCourseModule(request, response, decodeURIComponent(modulesMatch[1]));
+      const lessonCreateMatch = url.pathname.match(/^\/api\/modules\/([^/]+)\/lessons$/);
+      if (request.method === 'POST' && lessonCreateMatch) return await createModuleLesson(request, response, decodeURIComponent(lessonCreateMatch[1]));
+      const prerequisiteMatch = url.pathname.match(/^\/api\/lessons\/([^/]+)\/prerequisites$/);
+      if (request.method === 'POST' && prerequisiteMatch) return await addLessonPrerequisite(request, response, decodeURIComponent(prerequisiteMatch[1]));
       if (request.method === 'POST' && url.pathname === '/api/cohorts') return await createCohort(request, response);
       const staffMatch = url.pathname.match(/^\/api\/cohorts\/([^/]+)\/staff$/);
       if (request.method === 'POST' && staffMatch) return await assignLecturer(request, response, decodeURIComponent(staffMatch[1]));
