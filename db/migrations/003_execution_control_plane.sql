@@ -92,6 +92,9 @@ CREATE POLICY execution_job_events_tenant_isolation ON execution_job_events
 CREATE POLICY execution_workers_platform_only ON execution_workers
   USING (current_setting('app.execution_control_plane',true) = 'enabled')
   WITH CHECK (current_setting('app.execution_control_plane',true) = 'enabled');
+CREATE POLICY research_experiments_control_plane ON research_experiments
+  USING (organization_id::text = current_setting('app.current_organization_id',true) OR current_setting('app.execution_control_plane',true) = 'enabled')
+  WITH CHECK (organization_id::text = current_setting('app.current_organization_id',true) OR current_setting('app.execution_control_plane',true) = 'enabled');
 
 CREATE OR REPLACE FUNCTION claim_execution_job(
   p_worker_id uuid, p_provider text, p_lease_token_hash char(64), p_lease_seconds integer
@@ -113,6 +116,9 @@ BEGIN
   UPDATE execution_jobs SET status = 'dead_letter', worker_id = NULL, lease_token_hash = NULL,
     lease_expires_at = NULL, completed_at = now(), last_error_code = 'lease_expired_max_attempts', updated_at = now()
   WHERE status IN ('leased','running') AND lease_expires_at < now() AND attempt_count >= max_attempts;
+  UPDATE research_experiments e SET status='failed',completed_at=now()
+    FROM execution_jobs j WHERE j.resource_id=e.id AND j.organization_id=e.organization_id
+      AND j.job_type='research_experiment' AND j.status='dead_letter' AND e.status='running';
   IF NOT EXISTS (SELECT 1 FROM execution_workers WHERE id = p_worker_id
       AND provider = p_provider AND status = 'healthy'
       AND last_heartbeat_at > now() - interval '60 seconds'
