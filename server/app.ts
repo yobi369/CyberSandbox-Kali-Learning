@@ -300,6 +300,64 @@ async function enrol(request: IncomingMessage, response: ServerResponse): Promis
   send(response, 201, result);
 }
 
+
+async function listCohorts(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const session = await requireSession(request);
+  const cohorts = await inTenant(session, async (client) => {
+    const result = await client.query(
+      'SELECT h.id, h.name, h.status, h.starts_at, h.ends_at, c.id AS course_id, c.code AS course_code, c.title AS course_title, ' +
+      '(SELECT count(*) FROM enrollments e WHERE e.organization_id = h.organization_id AND e.cohort_id = h.id AND e.status = $2) AS enrolled_count ' +
+      'FROM cohorts h JOIN courses c ON c.id = h.course_id AND c.organization_id = h.organization_id WHERE h.organization_id = $1 AND ' +
+      '($3 NOT IN ($4,$5) OR EXISTS (SELECT 1 FROM cohort_staff cs WHERE cs.organization_id = h.organization_id AND cs.cohort_id = h.id AND cs.lecturer_user_id = $6)) ' +
+      'AND ($3 <> $7 OR h.status IN ($8,$9)) ORDER BY h.starts_at NULLS LAST, h.name',
+      [session.organizationId,'active',session.role,'lecturer','teaching_assistant',session.userId,'student','planned','active'],
+    );
+    return result.rows;
+  });
+  send(response, 200, { cohorts });
+}
+
+async function listSubmissions(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const session = await requireSession(request);
+  const submissions = await inTenant(session, async (client) => {
+    let sql = 'SELECT s.id, s.assignment_id, s.student_user_id, u.display_name AS learner, a.title AS assignment, s.status, s.submitted_at FROM submissions s JOIN users u ON u.id = s.student_user_id JOIN assignments a ON a.id = s.assignment_id AND a.organization_id = s.organization_id WHERE s.organization_id = $1';
+    const params: unknown[] = [session.organizationId];
+    if (session.role === 'student') { sql += ' AND s.student_user_id = $2'; params.push(session.userId); }
+    else if (session.role === 'lecturer') { sql += ' AND EXISTS (SELECT 1 FROM cohort_staff cs WHERE cs.organization_id = a.organization_id AND cs.cohort_id = a.cohort_id AND cs.lecturer_user_id = $2)'; params.push(session.userId); }
+    else if (!['institution_admin','platform_admin'].includes(session.role)) throw new HttpError(403, 'Role cannot view submissions.');
+    sql += ' ORDER BY s.submitted_at DESC LIMIT 250';
+    return (await client.query(sql, params)).rows;
+  });
+  send(response, 200, { submissions });
+}
+
+async function listPendingAssessments(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session, ['lecturer','institution_admin','platform_admin']);
+  const assessments = await inTenant(session, async (client) => {
+    let sql = "SELECT a.id, a.submission_id, a.score, a.lecturer_feedback, a.assessed_by, a.assessed_at, s.student_user_id, u.display_name AS learner, ass.title AS assignment, h.name AS cohort FROM assessments a JOIN submissions s ON s.id = a.submission_id AND s.organization_id = a.organization_id JOIN users u ON u.id = s.student_user_id JOIN assignments ass ON ass.id = s.assignment_id AND ass.organization_id = s.organization_id JOIN cohorts h ON h.id = ass.cohort_id AND h.organization_id = ass.organization_id WHERE a.organization_id = $1 AND a.moderation_status = 'pending'";
+    const params: unknown[] = [session.organizationId];
+    if (session.role === 'lecturer') { sql += ' AND EXISTS (SELECT 1 FROM cohort_staff cs WHERE cs.organization_id = ass.organization_id AND cs.cohort_id = ass.cohort_id AND cs.lecturer_user_id = $2)'; params.push(session.userId); }
+    sql += ' ORDER BY a.assessed_at ASC LIMIT 250';
+    return (await client.query(sql, params)).rows;
+  });
+  send(response, 200, { assessments });
+}
+
+async function listGradeHistory(request: IncomingMessage, response: ServerResponse, submissionId: string): Promise<void> {
+  const session = await requireSession(request);
+  requireUuid(submissionId);
+  const grades = await inTenant(session, async (client) => {
+    const source = await client.query('SELECT s.student_user_id, a.cohort_id FROM submissions s JOIN assignments a ON a.id = s.assignment_id AND a.organization_id = s.organization_id WHERE s.organization_id = $1 AND s.id = $2', [session.organizationId,submissionId]);
+    if (!source.rowCount) throw new HttpError(404, 'Submission not found.');
+    if (session.role === 'student' && source.rows[0].student_user_id !== session.userId) throw new HttpError(403, 'You cannot view another learner grade history.');
+    if (session.role === 'lecturer' && !await lecturerCanAccessCohort(client,session,source.rows[0].cohort_id)) throw new HttpError(403, 'You are not assigned to this cohort.');
+    if (!['student','lecturer','institution_admin','platform_admin'].includes(session.role)) throw new HttpError(403, 'Role cannot view grade history.');
+    return (await client.query('SELECT gh.id, gh.grade, gh.feedback, gh.rubric_version, gh.recorded_at, u.display_name AS recorded_by FROM grade_history gh JOIN users u ON u.id = gh.recorded_by WHERE gh.organization_id = $1 AND gh.submission_id = $2 ORDER BY gh.recorded_at DESC', [session.organizationId,submissionId])).rows;
+  });
+  send(response, 200, { grades });
+}
+
 async function listAssignments(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const session = await requireSession(request);
   const assignments = await inTenant(session, async (client) => {
@@ -850,6 +908,12 @@ export function createApiServer() {
       if (request.method === 'GET' && url.pathname === '/api/dashboard') return await dashboard(request, response);
       if (request.method === 'GET' && url.pathname === '/api/courses') return await listCourses(request, response);
       if (request.method === 'POST' && url.pathname === '/api/enrolments') return await enrol(request, response);
+
+      if (request.method === 'GET' && url.pathname === '/api/cohorts') return await listCohorts(request, response);
+      if (request.method === 'GET' && url.pathname === '/api/submissions') return await listSubmissions(request, response);
+      if (request.method === 'GET' && url.pathname === '/api/assessments/pending') return await listPendingAssessments(request, response);
+      const gradeHistoryMatch = url.pathname.match(/^\/api\/submissions\/([^/]+)\/grades$/);
+      if (request.method === 'GET' && gradeHistoryMatch) return await listGradeHistory(request, response, decodeURIComponent(gradeHistoryMatch[1]));
       if (request.method === 'GET' && url.pathname === '/api/assignments') return await listAssignments(request, response);
       if (request.method === 'POST' && url.pathname === '/api/assignments') return await createAssignment(request, response);
       const pathwayMatch = url.pathname.match(/^\/api\/courses\/([^/]+)\/pathway$/);
