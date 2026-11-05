@@ -285,8 +285,14 @@ BEGIN
   ELSIF TG_TABLE_NAME = 'assignments' THEN target_user := NEW.created_by; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
   ELSIF TG_TABLE_NAME = 'submissions' THEN target_user := NEW.student_user_id; allowed_roles := ARRAY['student'];
   ELSIF TG_TABLE_NAME = 'grade_appeals' THEN target_user := NEW.learner_user_id; allowed_roles := ARRAY['student'];
+  ELSIF TG_TABLE_NAME = 'grade_history' THEN target_user := NEW.recorded_by; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
   ELSIF TG_TABLE_NAME = 'academic_exports' THEN target_user := NEW.requested_by; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
-  ELSIF TG_TABLE_NAME = 'research_projects' THEN target_user := NEW.principal_investigator; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
+  ELSIF TG_TABLE_NAME = 'research_projects' THEN
+    target_user := NEW.principal_investigator; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
+    IF NEW.ethics_reviewed_by IS NOT NULL THEN
+      SELECT role,status INTO target_role,member_status FROM memberships WHERE user_id = NEW.ethics_reviewed_by AND organization_id = NEW.organization_id;
+      IF NOT FOUND OR member_status <> 'active' OR target_role NOT IN ('institution_admin','platform_admin') THEN RAISE EXCEPTION 'Ethics reviewer must be an active institution administrator'; END IF;
+    END IF;
   ELSIF TG_TABLE_NAME = 'research_workspaces' THEN target_user := NEW.owner_user_id; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
   ELSIF TG_TABLE_NAME = 'research_experiments' THEN target_user := NEW.created_by; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
   ELSIF TG_TABLE_NAME = 'research_datasets' THEN target_user := NEW.uploaded_by; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
@@ -349,7 +355,7 @@ DECLARE table_name text;
 BEGIN
   FOREACH table_name IN ARRAY ARRAY[
     'course_versions','cohort_staff','enrollments','lesson_completions','assignments',
-    'submissions','grade_appeals','academic_exports','research_projects','research_workspaces',
+    'submissions','grade_appeals','grade_history','academic_exports','research_projects','research_workspaces',
     'research_experiments','research_datasets','course_invitations','lab_definitions',
     'lab_sessions','assessments'
   ]
