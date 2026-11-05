@@ -90,6 +90,16 @@ async function requireSession(request: IncomingMessage): Promise<Session> {
   if (!session) throw new HttpError(401, 'Authentication required.');
   return session;
 }
+async function inTenant<T>(session: Session, operation: (client: import('pg').PoolClient) => Promise<T>): Promise<T> {
+  return inTenant(session, async (client) => {
+    const membership = await client.query(
+      'SELECT 1 FROM memberships m JOIN organizations o ON o.id = m.organization_id WHERE m.user_id = $1 AND m.organization_id = $2 AND m.status = $3 AND o.status = $4',
+      [session.userId, session.organizationId, 'active', 'active'],
+    );
+    if (!membership.rowCount) throw new HttpError(401, 'Institution membership is no longer active.');
+    return operation(client);
+  });
+}
 async function recordAudit(client: import('pg').PoolClient, session: Session, action: string, resourceType: string, resourceId: string | null): Promise<void> {
   await client.query(
     'INSERT INTO audit_events (organization_id, actor_user_id, action, resource_type, resource_id, outcome) VALUES ($1, $2, $3, $4, $5, $6)',
@@ -213,6 +223,7 @@ async function dashboard(request: IncomingMessage, response: ServerResponse): Pr
 
 async function listCourses(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const session = await requireSession(request);
+  requireRole(session, ['student', 'lecturer', 'institution_admin', 'platform_admin']);
   const courses = await withInstitution(session.organizationId, async (client) => {
     const result = await client.query(
       'SELECT DISTINCT c.id, c.code, c.title, c.description, c.level, cv.id AS course_version_id, cv.version ' +
@@ -238,6 +249,13 @@ async function pathway(request: IncomingMessage, response: ServerResponse, cours
         [session.organizationId, session.userId, 'active', courseId],
       );
       if (!access.rowCount) throw new HttpError(403, 'Enrolment is required to view this pathway.');
+    }
+    if (session.role === 'lecturer') {
+      const access = await client.query(
+        'SELECT 1 FROM cohorts h JOIN cohort_staff cs ON cs.cohort_id = h.id AND cs.organization_id = h.organization_id WHERE h.organization_id = $1 AND h.course_id = $2 AND cs.lecturer_user_id = $3 LIMIT 1',
+        [session.organizationId, courseId, session.userId],
+      );
+      if (!access.rowCount) throw new HttpError(403, 'You are not assigned to this course.');
     }
     const versions = await client.query(
       'SELECT id, version, title, learning_outcomes FROM course_versions WHERE organization_id = $1 AND course_id = $2 AND published_at IS NOT NULL ORDER BY version DESC LIMIT 1',
