@@ -5,7 +5,7 @@ import { pool } from './database.js';
 import { hashPassword } from './security.js';
 
 const integration = describe.skipIf(!process.env.DATABASE_URL);
-const allowedOrigin = 'https://cybersandbox-web-free.onrender.com';
+const allowedOrigin = 'https://cybersandbox-demo.pages.dev';
 let server: ReturnType<typeof createApiServer>;
 let baseUrl = '';
 
