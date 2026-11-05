@@ -182,7 +182,7 @@ async function logout(request: IncomingMessage, response: ServerResponse): Promi
 
 async function dashboard(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const session = await requireSession(request);
-  const data = await withInstitution(session.organizationId, async (client) => {
+  const data = await inTenant(session, async (client) => {
     if (session.role === 'student') {
       const result = await client.query(
         'SELECT ' +
@@ -224,7 +224,7 @@ async function dashboard(request: IncomingMessage, response: ServerResponse): Pr
 async function listCourses(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const session = await requireSession(request);
   requireRole(session, ['student', 'lecturer', 'institution_admin', 'platform_admin']);
-  const courses = await withInstitution(session.organizationId, async (client) => {
+  const courses = await inTenant(session, async (client) => {
     const result = await client.query(
       'SELECT DISTINCT c.id, c.code, c.title, c.description, c.level, cv.id AS course_version_id, cv.version ' +
       'FROM courses c JOIN course_versions cv ON cv.course_id = c.id AND cv.organization_id = c.organization_id AND cv.published_at IS NOT NULL ' +
@@ -242,7 +242,7 @@ async function listCourses(request: IncomingMessage, response: ServerResponse): 
 async function pathway(request: IncomingMessage, response: ServerResponse, courseId: string): Promise<void> {
   const session = await requireSession(request);
   requireUuid(courseId);
-  const result = await withInstitution(session.organizationId, async (client) => {
+  const result = await inTenant(session, async (client) => {
     if (session.role === 'student') {
       const access = await client.query(
         'SELECT 1 FROM enrollments e JOIN cohorts h ON h.id = e.cohort_id AND h.organization_id = e.organization_id WHERE e.organization_id = $1 AND e.student_user_id = $2 AND e.status = $3 AND h.course_id = $4',
@@ -281,7 +281,7 @@ async function enrol(request: IncomingMessage, response: ServerResponse): Promis
   requireRole(session, ['student']);
   const body = await readJson(request);
   const cohortId = requireUuid(requireValue(body.cohortId, 'cohort identifier', 64));
-  const result = await withInstitution(session.organizationId, async (client) => {
+  const result = await inTenant(session, async (client) => {
     const eligible = await client.query(
       'SELECT h.id FROM cohorts h JOIN courses c ON c.id = h.course_id AND c.organization_id = h.organization_id ' +
       'JOIN course_versions cv ON cv.id = h.course_version_id AND cv.organization_id = h.organization_id ' +
@@ -302,7 +302,7 @@ async function enrol(request: IncomingMessage, response: ServerResponse): Promis
 
 async function listAssignments(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const session = await requireSession(request);
-  const assignments = await withInstitution(session.organizationId, async (client) => {
+  const assignments = await inTenant(session, async (client) => {
     let sql = 'SELECT a.id, a.title, a.instructions, a.due_at, a.status, a.rubric_version, h.name AS cohort_name, c.code AS course_code FROM assignments a JOIN cohorts h ON h.id = a.cohort_id AND h.organization_id = a.organization_id JOIN courses c ON c.id = h.course_id AND c.organization_id = h.organization_id WHERE a.organization_id = $1';
     const params: unknown[] = [session.organizationId];
     if (session.role === 'student') {
@@ -333,7 +333,7 @@ async function createAssignment(request: IncomingMessage, response: ServerRespon
   if (rubric.length > 20000) throw new HttpError(400, 'Rubric is too large.');
   const dueAt = body.dueAt === undefined || body.dueAt === null ? null : new Date(requireValue(body.dueAt, 'due date', 64));
   if (dueAt && Number.isNaN(dueAt.getTime())) throw new HttpError(400, 'Invalid due date.');
-  const created = await withInstitution(session.organizationId, async (client) => {
+  const created = await inTenant(session, async (client) => {
     if (!await lecturerCanAccessCohort(client, session, cohortId)) throw new HttpError(403, 'You are not assigned to this cohort.');
     const result = await client.query(
       'INSERT INTO assignments (organization_id, cohort_id, title, instructions, rubric, due_at, status, created_by) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8) RETURNING id',
@@ -351,7 +351,7 @@ async function submitAssignment(request: IncomingMessage, response: ServerRespon
   requireUuid(assignmentId);
   const body = await readJson(request);
   const submissionBody = requireValue(body.body, 'submission', 100000);
-  const created = await withInstitution(session.organizationId, async (client) => {
+  const created = await inTenant(session, async (client) => {
     const eligible = await client.query(
       'SELECT a.id FROM assignments a JOIN enrollments e ON e.organization_id = a.organization_id AND e.cohort_id = a.cohort_id ' +
       'WHERE a.organization_id = $1 AND a.id = $2 AND a.status = $3 AND e.student_user_id = $4 AND e.status = $5 AND (a.due_at IS NULL OR a.due_at >= now())',
@@ -376,7 +376,7 @@ async function assessSubmission(request: IncomingMessage, response: ServerRespon
   const feedback = requireValue(body.feedback, 'lecturer feedback', 20000);
   const score = Number(body.score);
   if (!Number.isFinite(score) || score < 0 || score > 100) throw new HttpError(400, 'Score must be between 0 and 100.');
-  const assessment = await withInstitution(session.organizationId, async (client) => {
+  const assessment = await inTenant(session, async (client) => {
     const source = await client.query(
       'SELECT s.id, a.cohort_id, a.rubric_version FROM submissions s JOIN assignments a ON a.id = s.assignment_id AND a.organization_id = s.organization_id WHERE s.organization_id = $1 AND s.id = $2',
       [session.organizationId, submissionId],
@@ -402,7 +402,7 @@ async function moderateAssessment(request: IncomingMessage, response: ServerResp
   const body = await readJson(request);
   const decision = body.decision;
   if (!['approve', 'return', 'dispute'].includes(String(decision))) throw new HttpError(400, 'Decision must be approve, return, or dispute.');
-  const result = await withInstitution(session.organizationId, async (client) => {
+  const result = await inTenant(session, async (client) => {
     const source = await client.query(
       'SELECT a.id, a.assessed_by, a.score, a.lecturer_feedback, a.rubric_version, s.id AS submission_id, ass.cohort_id FROM assessments a JOIN submissions s ON s.id = a.submission_id AND s.organization_id = a.organization_id JOIN assignments ass ON ass.id = s.assignment_id AND ass.organization_id = s.organization_id WHERE a.organization_id = $1 AND a.id = $2 AND a.moderation_status = $3',
       [session.organizationId, assessmentId, 'pending'],
