@@ -11,5 +11,6 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev --no-audit --no-fund
 COPY --from=build /app/dist-server ./dist-server
+COPY --from=build /app/db ./db
 EXPOSE 4000
 CMD ["node", "dist-server/server/index.js"]
