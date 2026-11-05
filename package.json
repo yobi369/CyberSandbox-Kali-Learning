@@ -11,7 +11,9 @@
     "test": "vitest run",
     "check": "npm run typecheck && npm test && npm run build && npm run api:build",
     "api:build": "tsc -p tsconfig.server.json",
-    "api:start": "node dist-server/server/index.js"
+    "api:start": "node dist-server/server/index.js",
+    "db:migrate": "node dist-server/server/migrate.js",
+    "api:provision": "node dist-server/server/provision.js"
   },
   "dependencies": {
     "react": "^19.2.3",
