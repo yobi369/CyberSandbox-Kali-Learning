@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Lab } from '../types';
 import { generateMission } from '../services/geminiService';
-import { Target, Sparkles, Loader2, ShieldPlus, BookOpen, Lock, Terminal as TerminalIcon, ChevronRight, Zap, Filter } from 'lucide-react';
+import { Sparkles, Loader2, ShieldPlus, BookOpen, ChevronRight, Filter } from 'lucide-react';
 import { LABS } from '../constants';
 
 interface LabBrowserProps {
@@ -77,11 +77,11 @@ const LabBrowser: React.FC<LabBrowserProps> = ({ activeLabId, onSelectLab, compl
           </button>
         ))}
 
-        {/* AI GENERATOR */}
+        {/* Curated practice scenario selector */}
         <div className="pt-8 border-t border-white/5 space-y-6">
           <div className="flex items-center space-x-3 text-emerald-400 px-1">
             <Sparkles size={18} />
-            <h2 className="text-[10px] font-black uppercase tracking-[0.2em]">Unlimited Practice</h2>
+            <h2 className="text-[10px] font-black uppercase tracking-[0.2em]">Curated Practice</h2>
           </div>
           
           <div className="bg-slate-900/60 border border-white/5 rounded-3xl p-6 space-y-5">
@@ -108,7 +108,7 @@ const LabBrowser: React.FC<LabBrowserProps> = ({ activeLabId, onSelectLab, compl
                 className="w-full py-4 bg-slate-950 hover:bg-emerald-600 border border-white/10 hover:border-emerald-400 text-[10px] font-black rounded-2xl transition-all disabled:opacity-50 flex items-center justify-center uppercase tracking-[0.1em]"
             >
                 {isGenerating ? <Loader2 size={16} className="animate-spin mr-2" /> : <ShieldPlus size={16} className="mr-2" />}
-                Generate Dynamic Lab
+                Load Practice Scenario
             </button>
           </div>
         </div>

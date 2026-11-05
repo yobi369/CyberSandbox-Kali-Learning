@@ -33,7 +33,7 @@ const Mentor: React.FC<MentorProps> = ({ message, isTyping, currentStep, stepPro
             <Cpu className="text-cyan-400" size={20} />
           </div>
           <div>
-            <h3 className="text-[11px] font-black text-white uppercase tracking-widest">Cipher v5.0</h3>
+            <h3 className="text-[11px] font-black text-white uppercase tracking-widest">CyberSandbox Mentor</h3>
             <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-tighter">Tactical Advisor</span>
           </div>
         </div>
@@ -91,7 +91,17 @@ const Mentor: React.FC<MentorProps> = ({ message, isTyping, currentStep, stepPro
            <div className="h-full bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)] transition-all duration-1000" style={{ width: `${stepProgress}%` }}></div>
         </div>
         <div className="mt-6 flex justify-center space-x-4">
-           <button className="flex items-center space-x-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg border border-white/5 transition-all group">
+           <button
+              type="button"
+              onClick={() => {
+                if (currentStep && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                  window.speechSynthesis.cancel();
+                  window.speechSynthesis.speak(new SpeechSynthesisUtterance(currentStep.instruction));
+                }
+              }}
+              disabled={!currentStep}
+              className="flex items-center space-x-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 rounded-lg border border-white/5 transition-all group"
+            >
               <Volume2 size={16} className="text-cyan-500 group-hover:scale-110"/>
               <span className="text-[10px] font-black uppercase text-slate-300">Voice Comms</span>
            </button>
