@@ -51,6 +51,9 @@ jobs:
         run: npm run typecheck
 
 
+      - name: Build API
+        run: npm run api:build
+
       - name: Apply PostgreSQL migrations
         run: npm run db:migrate
 
@@ -60,5 +63,3 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Build API
-        run: npm run api:build
