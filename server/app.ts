@@ -39,7 +39,9 @@ async function readJson(request: IncomingMessage): Promise<Record<string, unknow
     if (length > MAX_BODY_BYTES) throw Object.assign(new Error('Request body too large.'), { statusCode: 413 });
     chunks.push(buffer);
   }
-  const parsed: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  let parsed: unknown;
+  try { parsed = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+  catch { throw Object.assign(new Error('Malformed JSON request body.'), { statusCode: 400 }); }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Object.assign(new Error('A JSON object is required.'), { statusCode: 400 });
   return parsed as Record<string, unknown>;
 }
