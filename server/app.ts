@@ -5,7 +5,7 @@ import { createSessionToken, hashSessionToken, parseCookies, verifyPassword } fr
 
 const SESSION_COOKIE = 'cybersandbox_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
-const MAX_BODY_BYTES = 16 * 1024;
+const MAX_BODY_BYTES = 128 * 1024;
 type Role = 'student' | 'lecturer' | 'institution_admin' | 'platform_admin' | 'lab_operator';
 type Session = {
   userId: string; email: string; displayName: string; organizationId: string;
