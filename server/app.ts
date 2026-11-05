@@ -678,6 +678,21 @@ async function activateCohort(request: IncomingMessage, response: ServerResponse
   send(response,200,result);
 }
 
+
+async function listAdminMemberships(request: IncomingMessage, response: ServerResponse, roleFilter: string | null): Promise<void> {
+  const session = await requireSession(request);
+  requireRole(session,['institution_admin','platform_admin']);
+  if (roleFilter && !['student','lecturer','institution_admin'].includes(roleFilter)) throw new HttpError(400,'Invalid membership role filter.');
+  const members = await inTenant(session,async(client)=>{
+    const result = await client.query(
+      'SELECT u.id AS user_id,u.email,u.display_name,m.role,m.status,m.created_at FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.organization_id = $1 AND ($2::text IS NULL OR m.role = $2) ORDER BY m.role,u.display_name LIMIT 1000',
+      [session.organizationId,roleFilter],
+    );
+    return result.rows;
+  });
+  send(response,200,{members});
+}
+
 async function listAdminCourses(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const session = await requireSession(request);
   requireRole(session,['institution_admin','platform_admin']);
@@ -1144,6 +1159,7 @@ export function createApiServer() {
       if (request.method === 'POST' && url.pathname === '/api/auth/logout') return await logout(request, response);
 
 
+      if (request.method === 'GET' && url.pathname === '/api/admin/memberships') return await listAdminMemberships(request,response,url.searchParams.get('role'));
       if (request.method === 'GET' && url.pathname === '/api/admin/courses') return await listAdminCourses(request,response);
       const adminModulesMatch = url.pathname.match(/^\/api\/admin\/courses\/([^/]+)\/modules$/);
       if (request.method === 'GET' && adminModulesMatch) return await listCourseModules(request,response,decodeURIComponent(adminModulesMatch[1]));
