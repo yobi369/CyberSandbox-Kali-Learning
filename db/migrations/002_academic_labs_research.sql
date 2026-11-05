@@ -224,7 +224,79 @@ DROP TRIGGER IF EXISTS research_provenance_immutable ON research_provenance;
 CREATE TRIGGER research_provenance_immutable BEFORE UPDATE OR DELETE ON research_provenance
 FOR EACH ROW EXECUTE FUNCTION reject_immutable_record_mutation();
 
-DO $$
+
+CREATE OR REPLACE FUNCTION reject_published_curriculum_mutation() RETURNS trigger LANGUAGE plpgsql AS $
+DECLARE version_id uuid;
+DECLARE published timestamptz;
+BEGIN
+  IF TG_TABLE_NAME = 'course_versions' THEN
+    IF TG_OP <> 'INSERT' AND OLD.published_at IS NOT NULL THEN
+      RAISE EXCEPTION 'Published course versions are immutable';
+    END IF;
+    IF TG_OP = 'INSERT' AND NEW.published_at IS NOT NULL THEN
+      RAISE EXCEPTION 'Course versions must be published through the application workflow';
+    END IF;
+    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+  ELSIF TG_TABLE_NAME = 'learning_modules' THEN
+    version_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.course_version_id ELSE NEW.course_version_id END;
+  ELSIF TG_TABLE_NAME = 'learning_lessons' THEN
+    SELECT course_version_id INTO version_id FROM learning_modules
+    WHERE organization_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.organization_id ELSE NEW.organization_id END
+      AND id = CASE WHEN TG_OP = 'DELETE' THEN OLD.module_id ELSE NEW.module_id END;
+  ELSIF TG_TABLE_NAME = 'lesson_prerequisites' THEN
+    SELECT m.course_version_id INTO version_id
+    FROM learning_lessons l JOIN learning_modules m ON m.id = l.module_id AND m.organization_id = l.organization_id
+    WHERE l.organization_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.organization_id ELSE NEW.organization_id END
+      AND l.id = CASE WHEN TG_OP = 'DELETE' THEN OLD.lesson_id ELSE NEW.lesson_id END;
+  END IF;
+  SELECT published_at INTO published FROM course_versions WHERE id = version_id;
+  IF published IS NOT NULL THEN RAISE EXCEPTION 'Published learning pathways are immutable'; END IF;
+  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END $;
+
+DROP TRIGGER IF EXISTS course_versions_immutable ON course_versions;
+CREATE TRIGGER course_versions_immutable BEFORE INSERT OR UPDATE OR DELETE ON course_versions
+FOR EACH ROW EXECUTE FUNCTION reject_published_curriculum_mutation();
+DROP TRIGGER IF EXISTS learning_modules_immutable ON learning_modules;
+CREATE TRIGGER learning_modules_immutable BEFORE INSERT OR UPDATE OR DELETE ON learning_modules
+FOR EACH ROW EXECUTE FUNCTION reject_published_curriculum_mutation();
+DROP TRIGGER IF EXISTS learning_lessons_immutable ON learning_lessons;
+CREATE TRIGGER learning_lessons_immutable BEFORE INSERT OR UPDATE OR DELETE ON learning_lessons
+FOR EACH ROW EXECUTE FUNCTION reject_published_curriculum_mutation();
+DROP TRIGGER IF EXISTS lesson_prerequisites_immutable ON lesson_prerequisites;
+CREATE TRIGGER lesson_prerequisites_immutable BEFORE INSERT OR UPDATE OR DELETE ON lesson_prerequisites
+FOR EACH ROW EXECUTE FUNCTION reject_published_curriculum_mutation();
+
+CREATE OR REPLACE FUNCTION verify_research_provenance_link() RETURNS trigger LANGUAGE plpgsql AS $
+DECLARE expected_previous char(64);
+BEGIN
+  SELECT event_hash INTO expected_previous FROM research_provenance
+  WHERE organization_id = NEW.organization_id AND project_id = NEW.project_id
+  ORDER BY occurred_at DESC, id DESC LIMIT 1;
+  IF NEW.previous_hash IS DISTINCT FROM expected_previous THEN
+    RAISE EXCEPTION 'Research provenance chain does not extend the latest event';
+  END IF;
+  RETURN NEW;
+END $;
+DROP TRIGGER IF EXISTS research_provenance_chain ON research_provenance;
+CREATE TRIGGER research_provenance_chain BEFORE INSERT ON research_provenance
+FOR EACH ROW EXECUTE FUNCTION verify_research_provenance_link();
+
+CREATE OR REPLACE FUNCTION require_moderated_grade() RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM assessments a
+    WHERE a.organization_id = NEW.organization_id AND a.id = NEW.assessment_id
+      AND a.submission_id = NEW.submission_id AND a.moderation_status = 'moderated'
+      AND a.score = NEW.grade
+  ) THEN RAISE EXCEPTION 'Grade history requires a matching moderated assessment'; END IF;
+  RETURN NEW;
+END $;
+DROP TRIGGER IF EXISTS grade_history_moderated_only ON grade_history;
+CREATE TRIGGER grade_history_moderated_only BEFORE INSERT ON grade_history
+FOR EACH ROW EXECUTE FUNCTION require_moderated_grade();
+
+DO $
 DECLARE table_name text;
 BEGIN
   FOREACH table_name IN ARRAY ARRAY[
