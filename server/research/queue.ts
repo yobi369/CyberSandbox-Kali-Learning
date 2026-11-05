@@ -127,18 +127,21 @@ export async function markResearchJobRunning(client: PoolClient, jobId: string, 
 }
 
 export async function finishResearchJob(client: PoolClient, input: { jobId: string; workerId: string; leaseToken: string; success: boolean; errorCode?: string }): Promise<void> {
-  const status = input.success ? 'succeeded' : 'failed';
   const result = await client.query(
-    `UPDATE execution_jobs SET status=$4,worker_id=NULL,lease_token_hash=NULL,lease_expires_at=NULL,
-       completed_at=now(),last_error_code=$5,updated_at=now()
+    `UPDATE execution_jobs SET
+       status=CASE WHEN $4::boolean THEN 'succeeded' WHEN attempt_count < max_attempts THEN 'queued' ELSE 'dead_letter' END,
+       worker_id=NULL,lease_token_hash=NULL,lease_expires_at=NULL,
+       available_at=CASE WHEN NOT $4::boolean AND attempt_count < max_attempts THEN now()+interval '30 seconds' ELSE available_at END,
+       completed_at=CASE WHEN $4::boolean OR attempt_count >= max_attempts THEN now() ELSE NULL END,
+       last_error_code=CASE WHEN $4::boolean THEN NULL ELSE $5 END,updated_at=now()
      WHERE id=$1 AND worker_id=$2 AND lease_token_hash=$3 AND status IN ('leased','running') AND lease_expires_at>now()
-     RETURNING organization_id`,
-    [input.jobId,input.workerId,hashLeaseToken(input.leaseToken),status,input.success ? null : (input.errorCode ?? 'worker_failed').slice(0,100)],
+     RETURNING organization_id,status`,
+    [input.jobId,input.workerId,hashLeaseToken(input.leaseToken),input.success,input.success ? null : (input.errorCode ?? 'worker_failed').slice(0,100)],
   );
   if (!result.rowCount) throw new Error('Research job lease is invalid, expired, or no longer owned by this worker.');
   await client.query('UPDATE execution_workers SET active_jobs=GREATEST(0,active_jobs-1),updated_at=now() WHERE id=$1',[input.workerId]);
   await client.query(
     'INSERT INTO execution_job_events(organization_id,job_id,event_type,details) VALUES($1,$2,$3,$4::jsonb)',
-    [result.rows[0].organization_id,input.jobId,status,JSON.stringify({workerId:input.workerId,errorCode:input.errorCode ?? null})],
+    [result.rows[0].organization_id,input.jobId,result.rows[0].status,JSON.stringify({workerId:input.workerId,errorCode:input.errorCode ?? null})],
   );
 }
