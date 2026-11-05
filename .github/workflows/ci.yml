@@ -37,5 +37,8 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      - name: Build
+      - name: Build frontend
         run: npm run build
+
+      - name: Build API
+        run: npm run api:build
