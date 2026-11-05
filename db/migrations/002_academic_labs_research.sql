@@ -228,8 +228,9 @@ FOR EACH ROW EXECUTE FUNCTION reject_immutable_record_mutation();
 
 
 CREATE OR REPLACE FUNCTION reject_published_curriculum_mutation() RETURNS trigger LANGUAGE plpgsql AS $
-DECLARE version_id uuid;
-DECLARE published timestamptz;
+DECLARE
+  version_id uuid;
+  published timestamptz;
 BEGIN
   IF TG_TABLE_NAME = 'course_versions' THEN
     IF TG_OP <> 'INSERT' AND OLD.published_at IS NOT NULL THEN
