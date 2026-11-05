@@ -404,7 +404,7 @@ async function moderateAssessment(request: IncomingMessage, response: ServerResp
   if (!['approve', 'return', 'dispute'].includes(String(decision))) throw new HttpError(400, 'Decision must be approve, return, or dispute.');
   const result = await withInstitution(session.organizationId, async (client) => {
     const source = await client.query(
-      'SELECT a.id, a.assessed_by, s.id AS submission_id, ass.cohort_id FROM assessments a JOIN submissions s ON s.id = a.submission_id AND s.organization_id = a.organization_id JOIN assignments ass ON ass.id = s.assignment_id AND ass.organization_id = s.organization_id WHERE a.organization_id = $1 AND a.id = $2 AND a.moderation_status = $3',
+      'SELECT a.id, a.assessed_by, a.score, a.lecturer_feedback, a.rubric_version, s.id AS submission_id, ass.cohort_id FROM assessments a JOIN submissions s ON s.id = a.submission_id AND s.organization_id = a.organization_id JOIN assignments ass ON ass.id = s.assignment_id AND ass.organization_id = s.organization_id WHERE a.organization_id = $1 AND a.id = $2 AND a.moderation_status = $3',
       [session.organizationId, assessmentId, 'pending'],
     );
     if (!source.rowCount) throw new HttpError(404, 'Pending assessment not found.');
@@ -419,6 +419,13 @@ async function moderateAssessment(request: IncomingMessage, response: ServerResp
       'UPDATE submissions SET status = $1 WHERE organization_id = $2 AND id = $3',
       [decision === 'approve' ? 'graded' : 'returned', session.organizationId, source.rows[0].submission_id],
     );
+    if (decision === 'approve') {
+      if (source.rows[0].score === null) throw new HttpError(409, 'An assessment must have a score before approval.');
+      await client.query(
+        'INSERT INTO grade_history (organization_id, submission_id, assessment_id, grade, feedback, rubric_version, recorded_by) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+        [session.organizationId, source.rows[0].submission_id, assessmentId, source.rows[0].score, source.rows[0].lecturer_feedback ?? '', source.rows[0].rubric_version, session.userId],
+      );
+    }
     await recordAudit(client, session, 'assessment.' + String(decision), 'assessment', assessmentId);
     return { assessmentId, moderationStatus: state };
   });
