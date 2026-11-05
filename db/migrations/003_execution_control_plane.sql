@@ -83,11 +83,11 @@ ALTER TABLE execution_job_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE execution_job_events FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY execution_jobs_tenant_isolation ON execution_jobs
-  USING (organization_id::text = current_setting('app.current_organization_id',true))
-  WITH CHECK (organization_id::text = current_setting('app.current_organization_id',true));
+  USING (organization_id::text = current_setting('app.current_organization_id',true) OR current_setting('app.execution_control_plane',true) = 'enabled')
+  WITH CHECK (organization_id::text = current_setting('app.current_organization_id',true) OR current_setting('app.execution_control_plane',true) = 'enabled');
 CREATE POLICY execution_job_events_tenant_isolation ON execution_job_events
-  USING (organization_id::text = current_setting('app.current_organization_id',true))
-  WITH CHECK (organization_id::text = current_setting('app.current_organization_id',true));
+  USING (organization_id::text = current_setting('app.current_organization_id',true) OR current_setting('app.execution_control_plane',true) = 'enabled')
+  WITH CHECK (organization_id::text = current_setting('app.current_organization_id',true) OR current_setting('app.execution_control_plane',true) = 'enabled');
 -- Worker inventory is platform-operated and is not visible to tenant application roles.
 CREATE POLICY execution_workers_platform_only ON execution_workers
   USING (current_setting('app.execution_control_plane',true) = 'enabled')
@@ -101,9 +101,15 @@ BEGIN
   IF p_lease_seconds < 30 OR p_lease_seconds > 300 THEN
     RAISE EXCEPTION 'Execution job lease must be between 30 and 300 seconds';
   END IF;
+  WITH expired AS (SELECT worker_id FROM execution_jobs WHERE status IN ('leased','running') AND lease_expires_at < now() AND attempt_count < max_attempts)
+  UPDATE execution_workers w SET active_jobs = GREATEST(0,w.active_jobs - x.n), updated_at = now()
+  FROM (SELECT worker_id,count(*)::integer AS n FROM expired GROUP BY worker_id) x WHERE w.id = x.worker_id;
   UPDATE execution_jobs SET status = 'queued', worker_id = NULL, lease_token_hash = NULL,
     lease_expires_at = NULL, available_at = now(), updated_at = now()
   WHERE status IN ('leased','running') AND lease_expires_at < now() AND attempt_count < max_attempts;
+  WITH expired AS (SELECT worker_id FROM execution_jobs WHERE status IN ('leased','running') AND lease_expires_at < now() AND attempt_count >= max_attempts)
+  UPDATE execution_workers w SET active_jobs = GREATEST(0,w.active_jobs - x.n), updated_at = now()
+  FROM (SELECT worker_id,count(*)::integer AS n FROM expired GROUP BY worker_id) x WHERE w.id = x.worker_id;
   UPDATE execution_jobs SET status = 'dead_letter', worker_id = NULL, lease_token_hash = NULL,
     lease_expires_at = NULL, completed_at = now(), last_error_code = 'lease_expired_max_attempts', updated_at = now()
   WHERE status IN ('leased','running') AND lease_expires_at < now() AND attempt_count >= max_attempts;
