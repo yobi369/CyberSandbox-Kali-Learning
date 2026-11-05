@@ -69,3 +69,6 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Build staging API container
+        run: docker build --file Dockerfile.api --tag cybersandbox-api:ci .
+

@@ -1,0 +1,37 @@
+# CyberSandbox API + PostgreSQL staging only.
+# Dedicated KVM/Firecracker workers are intentionally not defined here.
+services:
+  - type: web
+    name: cybersandbox-api-staging
+    runtime: docker
+    region: frankfurt
+    plan: 0.5c-512mb
+    dockerfilePath: ./Dockerfile.api
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    preDeployCommand: 'DATABASE_URL="$MIGRATOR_DATABASE_URL" npm run db:migrate && sh ops/postgres/apply-runtime-role.sh'
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4000"
+      - key: DATABASE_SSL
+        value: "true"
+      - key: MIGRATOR_DATABASE_URL
+        fromDatabase:
+          name: cybersandbox-staging-db
+          property: connectionString
+      - key: CYBERSANDBOX_APP_PASSWORD
+        generateValue: true
+      - key: APP_ORIGIN
+        sync: false
+
+databases:
+  - name: cybersandbox-staging-db
+    databaseName: cybersandbox_staging
+    user: cybersandbox_migrator
+    region: frankfurt
+    plan: 0.1c-256mb
+    postgresMajorVersion: "16"
+    ipAllowList: []
