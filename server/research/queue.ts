@@ -118,6 +118,23 @@ export async function claimResearchJob(workerId: string, provider: 'research_cpu
   } finally { client.release(); }
 }
 
+export async function withResearchWorkerContext<T>(organizationId: string, operation: (client: PoolClient) => Promise<T>): Promise<T> {
+  assertControlPlaneEnabled();
+  if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error('Invalid institution identifier for worker context.');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('app.current_organization_id',$1,true)",[organizationId]);
+    await client.query("SELECT set_config('app.execution_control_plane','enabled',true)");
+    const result = await operation(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
+}
+
 export async function markResearchJobRunning(client: PoolClient, jobId: string, workerId: string, leaseToken: string): Promise<void> {
   const result = await client.query(
     `UPDATE execution_jobs SET status='running',started_at=COALESCE(started_at,now()),updated_at=now()
