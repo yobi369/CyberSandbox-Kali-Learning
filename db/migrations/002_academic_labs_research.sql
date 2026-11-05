@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS course_invitations (
   invited_by uuid NOT NULL,
   expires_at timestamptz NOT NULL,
   accepted_at timestamptz,
+  revoked_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   FOREIGN KEY (invited_by, organization_id) REFERENCES memberships(user_id, organization_id)
 );
@@ -304,7 +305,9 @@ BEGIN
   ELSIF TG_TABLE_NAME = 'research_workspaces' THEN target_user := NEW.owner_user_id; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
   ELSIF TG_TABLE_NAME = 'research_experiments' THEN target_user := NEW.created_by; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
   ELSIF TG_TABLE_NAME = 'research_datasets' THEN target_user := NEW.uploaded_by; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
-  ELSIF TG_TABLE_NAME = 'course_invitations' THEN target_user := NEW.invited_by; allowed_roles := ARRAY['institution_admin','platform_admin'];
+  ELSIF TG_TABLE_NAME = 'course_invitations' THEN
+    IF TG_OP = 'UPDATE' THEN RETURN NEW; END IF;
+    target_user := NEW.invited_by; allowed_roles := ARRAY['institution_admin','platform_admin'];
   ELSIF TG_TABLE_NAME = 'lab_definitions' THEN
     target_user := NEW.approved_by;
     allowed_roles := ARRAY['institution_admin','platform_admin'];
@@ -406,6 +409,7 @@ BEGIN
 END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS one_active_appeal_per_submission ON grade_appeals (organization_id, submission_id) WHERE status IN ('open','under_review');
+CREATE UNIQUE INDEX IF NOT EXISTS one_live_invitation_per_email ON course_invitations (organization_id, lower(email)) WHERE accepted_at IS NULL AND revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS appeals_queue_idx ON grade_appeals (organization_id, status, created_at);
 CREATE INDEX IF NOT EXISTS grade_history_submission_idx ON grade_history (organization_id, submission_id, recorded_at);
 CREATE INDEX IF NOT EXISTS exports_queue_idx ON academic_exports (organization_id, status, created_at);
