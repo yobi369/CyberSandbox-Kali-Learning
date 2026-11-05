@@ -836,7 +836,7 @@ async function resolveAppeal(request: IncomingMessage, response: ServerResponse,
 
 function csvCell(value: unknown): string {
   const raw = value === null || value === undefined ? '' : String(value);
-  const text = /^[\\s]*[=+@-]/.test(raw) ? "'" + raw : raw;
+  const text = /^\s*[=+@-]/.test(raw) ? "'" + raw : raw;
   return '"' + text.replace(/"/g, '""') + '"';
 }
 async function exportAcademicCsv(request: IncomingMessage, response: ServerResponse, kind: 'gradebook' | 'cohort_roster'): Promise<void> {
@@ -978,7 +978,8 @@ async function getResearchProvenance(request: IncomingMessage, response: ServerR
       const occurredAt = new Date(event.occurred_at).toISOString();
       const payloadJson = canonicalJson(event.payload);
       const computed = createHash('sha256').update([previousHash ?? '',projectId,String(expectedSequence),event.actor_user_id,event.event_type,payloadJson,occurredAt].join('|')).digest('hex');
-      if (Number(event.sequence_no) !== expectedSequence || event.previous_hash !== previousHash || event.event_hash.trim() !== computed) {
+      const storedPrevious = event.previous_hash === null ? null : String(event.previous_hash).trim();
+      if (Number(event.sequence_no) !== expectedSequence || storedPrevious !== previousHash || String(event.event_hash).trim() !== computed) {
         throw new HttpError(409, 'Research provenance chain verification failed.');
       }
       previousHash = event.event_hash.trim();
