@@ -120,14 +120,15 @@ async function appendResearchProvenance(
   eventType: string, payload: unknown, experimentId: string | null = null, datasetId: string | null = null,
 ): Promise<void> {
   await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [projectId]);
-  const previous = await client.query('SELECT event_hash FROM research_provenance WHERE organization_id = $1 AND project_id = $2 ORDER BY occurred_at DESC, id DESC LIMIT 1', [session.organizationId, projectId]);
+  const previous = await client.query('SELECT event_hash, sequence_no FROM research_provenance WHERE organization_id = $1 AND project_id = $2 ORDER BY sequence_no DESC LIMIT 1', [session.organizationId, projectId]);
   const previousHash = previous.rows[0]?.event_hash ?? null;
+  const sequenceNo = Number(previous.rows[0]?.sequence_no ?? 0) + 1;
   const payloadJson = canonicalJson(payload);
   const occurredAt = new Date().toISOString();
   const eventHash = createHash('sha256').update([previousHash ?? '', projectId, session.userId, eventType, payloadJson, occurredAt].join('|')).digest('hex');
   await client.query(
-    'INSERT INTO research_provenance (organization_id, project_id, experiment_id, dataset_id, actor_user_id, event_type, payload, previous_hash, event_hash, occurred_at) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10)',
-    [session.organizationId,projectId,experimentId,datasetId,session.userId,eventType,payloadJson,previousHash,eventHash,occurredAt],
+    'INSERT INTO research_provenance (organization_id, project_id, experiment_id, dataset_id, actor_user_id, event_type, payload, sequence_no, previous_hash, event_hash, occurred_at) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11)',
+    [session.organizationId,projectId,experimentId,datasetId,session.userId,eventType,payloadJson,sequenceNo,previousHash,eventHash,occurredAt],
   );
 }
 
