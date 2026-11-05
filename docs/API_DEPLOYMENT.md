@@ -8,7 +8,7 @@ The API is a separate Node.js service. It must not share a process or filesystem
 - PostgreSQL 15+
 - Install dependencies with `npm install`.
 - Build with `npm run api:build`.
-- Apply the versioned schema with `npm run db:migrate`.
+- Apply both versioned migrations with `npm run db:migrate` (001 core university schema; 002 academic governance, lab control-plane and research provenance).
 - Start with `npm run api:start`.
 
 Required runtime configuration:
@@ -38,13 +38,25 @@ Run `npm run api:provision` in a controlled one-off job. These variables are con
 
 ## Current API surface
 
-- `POST /api/auth/login`, `GET /api/auth/session`, and `POST /api/auth/logout`.
-- `GET /api/dashboard` returns database-backed metrics for students, lecturers, or institution administrators.
-- `GET /api/courses` and `GET /api/courses/:id/pathway` provide published course and learning-pathway reads within the verified institution.
-- `POST /api/enrolments` allows a student to enrol in an open cohort.
-- `GET /api/assignments`, `POST /api/assignments`, and `POST /api/assignments/:id/submissions` support assignment discovery, lecturer/admin creation, and student submissions.
-- `POST /api/submissions/:id/assessments` records a lecturer assessment; `POST /api/assessments/:id/moderate` records a separate moderation decision.
+- Authentication: POST /api/auth/login, GET /api/auth/session, POST /api/auth/logout.
+- Dashboards: GET /api/dashboard provides database-backed role metrics.
+- Courses: GET /api/courses, GET /api/admin/courses, POST /api/courses, POST /api/courses/:id/modules, POST /api/modules/:id/lessons, POST /api/lessons/:id/prerequisites, POST /api/courses/:id/publish, GET /api/courses/:id/pathway.
+- Cohorts: GET /api/cohorts, POST /api/cohorts, POST /api/cohorts/:id/activate, POST /api/cohorts/:id/staff, POST /api/enrolments.
+- Assignments: GET /api/assignments, POST /api/assignments, POST /api/assignments/:id/publish, POST /api/assignments/:id/submissions.
+- Assessment: GET /api/submissions, POST /api/submissions/:id/assessments, GET /api/assessments/pending, POST /api/assessments/:id/moderate, GET /api/submissions/:id/grades.
+- Appeals: POST /api/submissions/:id/appeals, GET /api/appeals, POST /api/appeals/:id/resolve.
+- Exports: GET /api/exports/gradebook.csv and GET /api/exports/cohort-roster.csv.
+- Research metadata: POST /api/research/projects, POST /api/research/projects/:id/ethics-review, POST /api/research/projects/:id/workspaces, POST /api/research/workspaces/:id/experiments.
+- Lab definitions: POST /api/labs/definitions and POST /api/labs/definitions/:id/approve.
 
 ## Current limitations
 
-This is the first identity and tenant-schema slice, not a complete identity product. Invitation, password recovery, MFA, SSO, admin account lifecycle, dashboard APIs, and full authorization policies for academic operations remain future work. Integration tests against PostgreSQL with two institutions are required before pilot use.
+The university portal and API are implementation work, not a deployed service. No institution has been provisioned and no API URL is configured. The frontend expects same-origin /api routes; deploy behind a same-origin HTTPS reverse proxy so HttpOnly SameSite=Strict cookies work as intended.
+
+PostgreSQL migration 002 adds immutable moderated grade history, appeals, export job metadata, lab session/control-plane records, research projects/workspaces/experiments/dataset metadata and hash-linked provenance. The current CSV exports are generated synchronously; the academic_exports queue table is reserved for future asynchronous artifact generation.
+
+Invitation delivery, password recovery, MFA, SSO, account lifecycle UI, grade appeal evidence storage, object storage, dataset upload/scanning, project collaborator membership and research result artifact storage remain future work.
+
+Live lab session creation deliberately returns HTTP 503 even if environment variables are set: no attested worker adapter is connected. Research workspace/experiment endpoints record metadata only; they do not execute code. The Firecracker/KVM runbook describes required host infrastructure and acceptance tests. Do not deploy student execution on the API host, Render web service or Vercel serverless functions.
+
+The CI workflow now applies migrations to a disposable PostgreSQL 16 service and runs the two-institution row-level security and database role-enforcement integration test. A green CI run does not replace staging tests using the exact non-owner production database role, backup/restore validation, or independent security review.
