@@ -32,3 +32,15 @@ A completed experiment result manifest must bind the run to an immutable source 
 ## Explicit non-goals
 
 No API route is added to accept arbitrary uploads or run commands. No production secret, storage endpoint, worker address or provider credential is embedded in source. No tenant is allowed to use a worker based solely on a self-reported heartbeat.
+
+## Durable queue and worker service
+
+Migration `003_execution_control_plane.sql` adds a durable tenant-scoped execution queue, worker inventory, lease tokens, attempt limits, event history and dataset scan-state columns. The migration runner applies it after the existing university and academic migrations.
+
+Research jobs are admitted only after the experiment is tied to the specified active project, the project has approved or not-required ethics status, source and environment digests match the experiment record, and every dataset is available with a clean scan result and matching checksum. Admission stores a SHA-256 digest of the canonical request payload and appends an audit-chain event.
+
+The worker-facing queue functions are in `server/research/queue.ts`. Set `EXECUTION_CONTROL_PLANE_ENABLED=true` only in a dedicated worker/controller process, never in the public web API environment. The controller must register workers through a privileged administrative path, heartbeat at least once per minute, and keep its database credentials separate from student-facing credentials. Worker transactions use `withResearchWorkerContext(organizationId, ...)` to set both the tenant scope and the execution-control-plane scope before marking or finishing a job.
+
+Claims use PostgreSQL `FOR UPDATE SKIP LOCKED`, worker health/capacity checks, short-lived hashed lease tokens, and 30–300 second leases. Expired leases are reclaimed; attempts are bounded and exhausted jobs enter dead-letter state. Failed attempts are requeued after a short backoff. The controller must renew leases while work is active, terminate work when lease renewal fails, and reconcile provider-side processes after controller restarts.
+
+This queue is an integration foundation, not a running worker service. No endpoint or worker registration credential is exposed to students. A worker must still independently validate signed manifests, enforce host-side resource/network boundaries, verify output checksums, and attest its runtime. Database job state alone is not proof that compute executed safely.
