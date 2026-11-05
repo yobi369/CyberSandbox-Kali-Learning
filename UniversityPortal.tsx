@@ -9,7 +9,6 @@ const secondary = 'rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-s
 const panel = 'rounded-2xl border border-slate-800 bg-slate-900/70 p-5';
 async function api<T=any>(path:string, init:RequestInit={}):Promise<T>{
   const response=await fetch(path,{...init,credentials:'same-origin',headers:{...(init.body?{'content-type':'application/json'}:{}),...(init.headers??{})}});
-  const response=await fetch(API_ORIGIN + path,{...init,credentials:'include',headers:{...(init.body?{'content-type':'application/json'}:{}),...(init.headers??{})}});
   const type=response.headers.get('content-type')??'';
   if(!response.ok){const body=type.includes('json')?await response.json().catch(()=>({})):{};throw new Error(body.error??'Request failed ('+response.status+').');}
   if(type.includes('text/csv'))return await response.text() as T;
