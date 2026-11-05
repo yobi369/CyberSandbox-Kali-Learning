@@ -4,7 +4,7 @@ import { pool } from './database.js';
 
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
 
-const migrations = ['001_university_core', '002_academic_labs_research'];
+const migrations = ['001_university_core', '002_academic_labs_research', '003_execution_control_plane'];
 const client = await pool.connect();
 try {
   await client.query('BEGIN');
