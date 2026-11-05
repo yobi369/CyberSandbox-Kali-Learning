@@ -269,6 +269,65 @@ DROP TRIGGER IF EXISTS lesson_prerequisites_immutable ON lesson_prerequisites;
 CREATE TRIGGER lesson_prerequisites_immutable BEFORE INSERT OR UPDATE OR DELETE ON lesson_prerequisites
 FOR EACH ROW EXECUTE FUNCTION reject_published_curriculum_mutation();
 
+
+CREATE OR REPLACE FUNCTION enforce_academic_membership_role() RETURNS trigger LANGUAGE plpgsql AS $
+DECLARE target_user uuid;
+DECLARE target_role text;
+DECLARE allowed_roles text[];
+DECLARE member_status text;
+BEGIN
+  target_user := NULL;
+  allowed_roles := ARRAY[]::text[];
+  IF TG_TABLE_NAME = 'course_versions' THEN target_user := NEW.created_by; allowed_roles := ARRAY['institution_admin','platform_admin'];
+  ELSIF TG_TABLE_NAME = 'cohort_staff' THEN target_user := NEW.lecturer_user_id; allowed_roles := ARRAY['lecturer'];
+  ELSIF TG_TABLE_NAME = 'enrollments' THEN target_user := NEW.student_user_id; allowed_roles := ARRAY['student'];
+  ELSIF TG_TABLE_NAME = 'lesson_completions' THEN target_user := NEW.learner_user_id; allowed_roles := ARRAY['student'];
+  ELSIF TG_TABLE_NAME = 'assignments' THEN target_user := NEW.created_by; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
+  ELSIF TG_TABLE_NAME = 'submissions' THEN target_user := NEW.student_user_id; allowed_roles := ARRAY['student'];
+  ELSIF TG_TABLE_NAME = 'grade_appeals' THEN target_user := NEW.learner_user_id; allowed_roles := ARRAY['student'];
+  ELSIF TG_TABLE_NAME = 'academic_exports' THEN target_user := NEW.requested_by; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
+  ELSIF TG_TABLE_NAME = 'research_projects' THEN target_user := NEW.principal_investigator; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
+  ELSIF TG_TABLE_NAME = 'research_workspaces' THEN target_user := NEW.owner_user_id; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
+  ELSIF TG_TABLE_NAME = 'research_experiments' THEN target_user := NEW.created_by; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
+  ELSIF TG_TABLE_NAME = 'research_datasets' THEN target_user := NEW.uploaded_by; allowed_roles := ARRAY['lecturer','institution_admin','platform_admin'];
+  ELSIF TG_TABLE_NAME = 'course_invitations' THEN target_user := NEW.invited_by; allowed_roles := ARRAY['institution_admin','platform_admin'];
+  ELSIF TG_TABLE_NAME = 'lab_definitions' THEN
+    target_user := NEW.approved_by;
+    allowed_roles := ARRAY['institution_admin','platform_admin'];
+  ELSIF TG_TABLE_NAME = 'lab_sessions' THEN target_user := NEW.owner_user_id; allowed_roles := ARRAY['student','lecturer'];
+  ELSIF TG_TABLE_NAME = 'assessments' THEN
+    IF NEW.assessed_by IS NOT NULL THEN
+      SELECT role,status INTO target_role,member_status FROM memberships WHERE user_id = NEW.assessed_by AND organization_id = NEW.organization_id;
+      IF NOT FOUND OR member_status <> 'active' OR target_role NOT IN ('lecturer','institution_admin','platform_admin') THEN
+        RAISE EXCEPTION 'Assessment actor must be an active lecturer or administrator in this institution';
+      END IF;
+    END IF;
+    IF NEW.moderated_by IS NOT NULL THEN
+      SELECT role,status INTO target_role,member_status FROM memberships WHERE user_id = NEW.moderated_by AND organization_id = NEW.organization_id;
+      IF NOT FOUND OR member_status <> 'active' OR target_role NOT IN ('lecturer','institution_admin','platform_admin') THEN
+        RAISE EXCEPTION 'Assessment moderator must be an active lecturer or administrator in this institution';
+      END IF;
+    END IF;
+    RETURN NEW;
+  ELSE
+    RETURN NEW;
+  END IF;
+  IF target_user IS NULL THEN RETURN NEW; END IF;
+  SELECT role,status INTO target_role,member_status FROM memberships WHERE user_id = target_user AND organization_id = NEW.organization_id;
+  IF NOT FOUND OR member_status <> 'active' OR target_role <> ALL(allowed_roles) THEN
+    RAISE EXCEPTION 'Actor does not have the required active institution membership role for %', TG_TABLE_NAME;
+  END IF;
+  IF TG_TABLE_NAME = 'submissions' THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM assignments a JOIN enrollments e
+        ON e.organization_id = a.organization_id AND e.cohort_id = a.cohort_id
+      WHERE a.organization_id = NEW.organization_id AND a.id = NEW.assignment_id
+        AND a.status = 'published' AND e.student_user_id = NEW.student_user_id AND e.status = 'active'
+    ) THEN RAISE EXCEPTION 'Submission requires an active enrolment in the published assignment cohort'; END IF;
+  END IF;
+  RETURN NEW;
+END $;
+
 CREATE OR REPLACE FUNCTION verify_research_provenance_link() RETURNS trigger LANGUAGE plpgsql AS $
 DECLARE expected_previous char(64);
 BEGIN
@@ -283,6 +342,22 @@ END $;
 DROP TRIGGER IF EXISTS research_provenance_chain ON research_provenance;
 CREATE TRIGGER research_provenance_chain BEFORE INSERT ON research_provenance
 FOR EACH ROW EXECUTE FUNCTION verify_research_provenance_link();
+
+
+DO $
+DECLARE table_name text;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY[
+    'course_versions','cohort_staff','enrollments','lesson_completions','assignments',
+    'submissions','grade_appeals','academic_exports','research_projects','research_workspaces',
+    'research_experiments','research_datasets','course_invitations','lab_definitions',
+    'lab_sessions','assessments'
+  ]
+  LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS academic_membership_role ON %I', table_name);
+    EXECUTE format('CREATE TRIGGER academic_membership_role BEFORE INSERT OR UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION enforce_academic_membership_role()', table_name);
+  END LOOP;
+END $;
 
 CREATE OR REPLACE FUNCTION require_moderated_grade() RETURNS trigger LANGUAGE plpgsql AS $
 BEGIN
