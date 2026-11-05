@@ -33,6 +33,12 @@ Protected data access must use `withInstitution(verifiedMembership.organizationI
 
 The API runtime database role must not own tables, bypass row-level security, or inherit the migration role. RLS is not a substitute for authorization: each future endpoint must also check role, cohort membership, resource ownership, and operation-specific permissions.
 
+## Academic API slice
+
+The authenticated API now exposes institution-scoped role dashboards, published course discovery, course pathway reads, student cohort enrolment, assignment listing and creation, student submissions, lecturer assessment, and a separate moderation decision. Lecturer access to cohort work is checked against the cohort teaching assignment. A lecturer cannot moderate their own assessment; an institution administrator or a different assigned lecturer must do so. Dashboard figures are database aggregates, not browser-generated demo values.
+
+Course and course-version publication, cohort/staff provisioning, account invitations, lesson-completion writes, grade appeals, and full administrative UI are not yet implemented. Academic API endpoints are not ready for institutional pilot until PostgreSQL integration tests prove the role and tenant boundaries.
+
 ## API errors and operational requirements
 
 Responses are JSON with no-store caching and basic browser security headers. Request bodies are bounded. The API does not enable permissive CORS. Configure an exact `APP_ORIGIN`; use a same-origin reverse proxy where possible.
