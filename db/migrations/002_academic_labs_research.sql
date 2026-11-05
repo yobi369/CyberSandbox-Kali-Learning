@@ -163,6 +163,7 @@ CREATE TABLE IF NOT EXISTS research_experiments (
   status text NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','completed','failed','cancelled')),
   started_at timestamptz,
   completed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
   result_manifest jsonb,
   FOREIGN KEY (organization_id, workspace_id) REFERENCES research_workspaces(organization_id, id),
   FOREIGN KEY (created_by, organization_id) REFERENCES memberships(user_id, organization_id),
