@@ -161,7 +161,9 @@ CREATE TABLE IF NOT EXISTS research_experiments (
   title text NOT NULL,
   hypothesis text NOT NULL,
   protocol jsonb NOT NULL,
-  code_revision text NOT NULL CHECK (code_revision ~ '^[a-fA-F0-9]{40}
+  code_revision text NOT NULL CHECK (length(code_revision) = 40 AND code_revision !~ '[^a-fA-F0-9]'),
+  environment_digest text NOT NULL CHECK ((length(environment_digest) = 64 AND environment_digest !~ '[^a-fA-F0-9]') OR (length(environment_digest) = 71 AND left(environment_digest, 7) = 'sha256:' AND substring(environment_digest from 8) !~ '[^a-fA-F0-9]')),
+  dependency_lock_digest text NOT NULL CHECK (length(dependency_lock_digest) = 71 AND left(dependency_lock_digest, 7) = 'sha256:' AND substring(dependency_lock_digest from 8) !~ '[^a-fA-F0-9]'),
   random_seed bigint NOT NULL,
   status text NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','completed','failed','cancelled')),
   started_at timestamptz,
