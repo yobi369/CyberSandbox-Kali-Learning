@@ -37,6 +37,8 @@ The proposed curriculum distinguishes undergraduate BIT foundations and progress
 
 ## Product readiness documentation
 
+- [API deployment and first institution setup](docs/API_DEPLOYMENT.md) — separate API service, migrations, and controlled institution bootstrap.
+- [Authentication and institution isolation](docs/AUTHENTICATION_AND_TENANCY.md) — server-side sessions, role membership, PostgreSQL row-level security, and remaining identity gates.
 - [University readiness and adoption standard](docs/UNIVERSITY_READINESS.md) — readiness levels, safety requirements, adoption checklist, and current honest status.
 - [University curriculum map](docs/CURRICULUM_MAP.md) — proposed undergraduate and postgraduate pathways and lab content standard.
 - [Lab platform architecture](docs/LAB_PLATFORM_ARCHITECTURE.md) — target backend, tenant boundaries, isolated lab orchestration, data model, and security requirements.
@@ -70,12 +72,12 @@ The GitHub Actions workflow runs TypeScript validation, unit tests, and the prod
 
 ## Current release status
 
-The current simulator is a demonstration and formative-practice foundation. It is not yet a university pilot release, live cybersecurity lab, formal assessment system, or research platform. The release gates in docs/UNIVERSITY_READINESS.md and docs/QUALITY_ASSURANCE.md must be evidenced before those claims can be made.
+The current simulator is a demonstration and formative-practice foundation. A first PostgreSQL-backed authentication API and institution-scoped schema are now under development on the university-platform branch; they are not yet deployed or pilot-ready. It is not yet a university pilot release, live cybersecurity lab, formal assessment system, or research platform. The release gates in docs/UNIVERSITY_READINESS.md and docs/QUALITY_ASSURANCE.md must be evidenced before those claims can be made.
 
 ## Development sequence
 
 1. Complete simulator correctness, curriculum integrity, accessibility, and repeatable CI.
-2. Build server-side identity, organization/tenant isolation, and authoritative learning records.
+2. Complete and independently test server-side identity, organization/tenant isolation, and authoritative learning records.
 3. Build instructor, cohort, assignment, submission, moderation, and export workflows.
 4. Validate assessment quality with independent educators; keep human moderation for consequential outcomes.
 5. Pilot disposable isolated lab infrastructure separately from the web application.
