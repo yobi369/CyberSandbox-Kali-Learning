@@ -125,7 +125,7 @@ async function appendResearchProvenance(
   const sequenceNo = Number(previous.rows[0]?.sequence_no ?? 0) + 1;
   const payloadJson = canonicalJson(payload);
   const occurredAt = new Date().toISOString();
-  const eventHash = createHash('sha256').update([previousHash ?? '', projectId, session.userId, eventType, payloadJson, occurredAt].join('|')).digest('hex');
+  const eventHash = createHash('sha256').update([previousHash ?? '', projectId, String(sequenceNo), session.userId, eventType, payloadJson, occurredAt].join('|')).digest('hex');
   await client.query(
     'INSERT INTO research_provenance (organization_id, project_id, experiment_id, dataset_id, actor_user_id, event_type, payload, sequence_no, previous_hash, event_hash, occurred_at) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11)',
     [session.organizationId,projectId,experimentId,datasetId,session.userId,eventType,payloadJson,sequenceNo,previousHash,eventHash,occurredAt],
@@ -413,7 +413,19 @@ async function createAssignment(request: IncomingMessage, response: ServerRespon
   const title = requireValue(body.title, 'assignment title', 180);
   const instructions = requireValue(body.instructions, 'assignment instructions', 20000);
   if (!body.rubric || typeof body.rubric !== 'object' || Array.isArray(body.rubric)) throw new HttpError(400, 'A structured rubric is required.');
-  const rubric = JSON.stringify(body.rubric);
+  const rubricObject = body.rubric as Record<string, unknown>;
+  const criteria = rubricObject.criteria;
+  if (!Array.isArray(criteria) || criteria.length < 1 || criteria.length > 20 ||
+      criteria.some((item) => !item || typeof item !== 'object' || typeof (item as Record<string, unknown>).id !== 'string' ||
+        !/^[a-z0-9_-]{2,48}$/i.test(String((item as Record<string, unknown>).id)) ||
+        !Number.isFinite(Number((item as Record<string, unknown>).weight)) || Number((item as Record<string, unknown>).weight) <= 0)) {
+    throw new HttpError(400, 'Rubric must contain 1–20 criteria with unique IDs and positive weights.');
+  }
+  const ids = criteria.map((item) => String((item as Record<string, unknown>).id));
+  if (new Set(ids).size !== ids.length || Math.abs(criteria.reduce((sum, item) => sum + Number((item as Record<string, unknown>).weight), 0) - 100) > 0.001) {
+    throw new HttpError(400, 'Rubric criterion IDs must be unique and weights must total 100.');
+  }
+  const rubric = JSON.stringify(rubricObject);
   if (rubric.length > 20000) throw new HttpError(400, 'Rubric is too large.');
   const dueAt = body.dueAt === undefined || body.dueAt === null ? null : new Date(requireValue(body.dueAt, 'due date', 64));
   if (dueAt && Number.isNaN(dueAt.getTime())) throw new HttpError(400, 'Invalid due date.');
@@ -462,7 +474,7 @@ async function assessSubmission(request: IncomingMessage, response: ServerRespon
   if (!Number.isFinite(score) || score < 0 || score > 100) throw new HttpError(400, 'Score must be between 0 and 100.');
   const assessment = await inTenant(session, async (client) => {
     const source = await client.query(
-      'SELECT s.id, a.cohort_id, a.rubric_version FROM submissions s JOIN assignments a ON a.id = s.assignment_id AND a.organization_id = s.organization_id WHERE s.organization_id = $1 AND s.id = $2',
+      'SELECT s.id, a.cohort_id, a.rubric_version FROM submissions s JOIN assignments a ON a.id = s.assignment_id AND a.organization_id = s.organization_id WHERE s.organization_id = $1 AND s.id = $2 FOR UPDATE OF s',
       [session.organizationId, submissionId],
     );
     if (!source.rowCount) throw new HttpError(404, 'Submission not found.');
@@ -488,7 +500,7 @@ async function moderateAssessment(request: IncomingMessage, response: ServerResp
   if (!['approve', 'return', 'dispute'].includes(String(decision))) throw new HttpError(400, 'Decision must be approve, return, or dispute.');
   const result = await inTenant(session, async (client) => {
     const source = await client.query(
-      'SELECT a.id, a.assessed_by, a.score, a.lecturer_feedback, a.rubric_version, s.id AS submission_id, ass.cohort_id FROM assessments a JOIN submissions s ON s.id = a.submission_id AND s.organization_id = a.organization_id JOIN assignments ass ON ass.id = s.assignment_id AND ass.organization_id = s.organization_id WHERE a.organization_id = $1 AND a.id = $2 AND a.moderation_status = $3',
+      'SELECT a.id, a.assessed_by, a.score, a.lecturer_feedback, a.rubric_version, s.id AS submission_id, ass.cohort_id FROM assessments a JOIN submissions s ON s.id = a.submission_id AND s.organization_id = a.organization_id JOIN assignments ass ON ass.id = s.assignment_id AND ass.organization_id = s.organization_id WHERE a.organization_id = $1 AND a.id = $2 AND a.moderation_status = $3 FOR UPDATE OF a, s',
       [session.organizationId, assessmentId, 'pending'],
     );
     if (!source.rowCount) throw new HttpError(404, 'Pending assessment not found.');
@@ -876,7 +888,13 @@ async function createResearchWorkspace(request: IncomingMessage, response: Serve
   requireUuid(projectId);
   const body = await readJson(request);
   const spec = body.environmentSpec && typeof body.environmentSpec === 'object' && !Array.isArray(body.environmentSpec) ? JSON.stringify(body.environmentSpec) : '{}';
-  const quota = body.resourceQuota && typeof body.resourceQuota === 'object' && !Array.isArray(body.resourceQuota) ? JSON.stringify(body.resourceQuota) : JSON.stringify({ cpuMillis: 1000, memoryMiB: 2048, diskMiB: 4096, maxDurationSeconds: 3600 });
+  const quotaObject = body.resourceQuota && typeof body.resourceQuota === 'object' && !Array.isArray(body.resourceQuota) ? body.resourceQuota as Record<string, unknown> : { cpuMillis: 1000, memoryMiB: 2048, diskMiB: 4096, maxDurationSeconds: 3600 };
+  const quota = JSON.stringify(quotaObject);
+  const cpu = Number(quotaObject.cpuMillis), memory = Number(quotaObject.memoryMiB), disk = Number(quotaObject.diskMiB), duration = Number(quotaObject.maxDurationSeconds);
+  if (!Number.isInteger(cpu) || cpu < 100 || cpu > 8000 || !Number.isInteger(memory) || memory < 256 || memory > 16384 ||
+      !Number.isInteger(disk) || disk < 512 || disk > 32768 || !Number.isInteger(duration) || duration < 60 || duration > 14400) {
+    throw new HttpError(400, 'Workspace quotas exceed the institution research limits.');
+  }
   if (spec.length > 10000 || quota.length > 2000) throw new HttpError(400, 'Workspace configuration is too large.');
   const workspace = await inTenant(session, async (client) => {
     const project = await client.query('SELECT id, ethics_status FROM research_projects WHERE organization_id = $1 AND id = $2', [session.organizationId, projectId]);
@@ -949,7 +967,7 @@ async function createLabDefinition(request: IncomingMessage, response: ServerRes
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !/^sha256:[a-f0-9]{64}$/.test(digest) || !['guided','isolated_kali','research'].includes(String(mode)) || policy.length > 10000) throw new HttpError(400, 'Invalid lab definition.');
   const parsed = JSON.parse(policy) as Record<string, unknown>;
   const egress = parsed.egress as Record<string, unknown> | undefined;
-  if (!egress || egress.default !== 'deny' || parsed.hostMounts !== false || parsed.privileged !== false) throw new HttpError(400, 'Lab policy must explicitly deny egress, host mounts and privileged execution.');
+  if (!egress || egress.default !== 'deny' || (Array.isArray(egress.allow) && egress.allow.length > 0) || parsed.hostMounts !== false || parsed.privileged !== false || parsed.hostNetwork !== false || parsed.runtimeSocket !== false || parsed.cloudMetadata !== false) throw new HttpError(400, 'Lab policy must explicitly deny egress, host mounts, host networking, runtime sockets, metadata access and privileged execution.');
   const result = await inTenant(session, async (client) => {
     const lab = await client.query("INSERT INTO lab_definitions (organization_id, slug, title, description, image_digest, target_mode, policy, version, status) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,1,'draft') RETURNING id, status", [session.organizationId,slug,title,description,digest,mode,policy]);
     await recordAudit(client, session, 'lab_definition.created', 'lab_definition', lab.rows[0].id);
