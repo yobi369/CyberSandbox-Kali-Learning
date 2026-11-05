@@ -238,7 +238,7 @@ BEGIN
     IF TG_OP = 'INSERT' AND NEW.published_at IS NOT NULL THEN
       RAISE EXCEPTION 'Course versions must be published through the application workflow';
     END IF;
-    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
   ELSIF TG_TABLE_NAME = 'learning_modules' THEN
     version_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.course_version_id ELSE NEW.course_version_id END;
   ELSIF TG_TABLE_NAME = 'learning_lessons' THEN
@@ -253,7 +253,7 @@ BEGIN
   END IF;
   SELECT published_at INTO published FROM course_versions WHERE id = version_id;
   IF published IS NOT NULL THEN RAISE EXCEPTION 'Published learning pathways are immutable'; END IF;
-  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+  IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
 END $;
 
 DROP TRIGGER IF EXISTS course_versions_immutable ON course_versions;
@@ -316,6 +316,7 @@ BEGIN
   END LOOP;
 END $$;
 
+CREATE UNIQUE INDEX IF NOT EXISTS one_active_appeal_per_submission ON grade_appeals (organization_id, submission_id) WHERE status IN ('open','under_review');
 CREATE INDEX IF NOT EXISTS appeals_queue_idx ON grade_appeals (organization_id, status, created_at);
 CREATE INDEX IF NOT EXISTS grade_history_submission_idx ON grade_history (organization_id, submission_id, recorded_at);
 CREATE INDEX IF NOT EXISTS exports_queue_idx ON academic_exports (organization_id, status, created_at);
