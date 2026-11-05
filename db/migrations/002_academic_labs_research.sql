@@ -128,10 +128,14 @@ CREATE TABLE IF NOT EXISTS research_projects (
   research_question text NOT NULL,
   methodology jsonb NOT NULL,
   ethics_status text NOT NULL DEFAULT 'pending' CHECK (ethics_status IN ('pending','approved','rejected','not_required')),
+  ethics_reference text,
+  ethics_reviewed_by uuid,
+  ethics_reviewed_at timestamptz,
   status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','completed','archived')),
   principal_investigator uuid NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   FOREIGN KEY (principal_investigator, organization_id) REFERENCES memberships(user_id, organization_id),
+  FOREIGN KEY (ethics_reviewed_by, organization_id) REFERENCES memberships(user_id, organization_id),
   UNIQUE (organization_id, id)
 );
 
