@@ -19,7 +19,7 @@ DATABASE_URL="$(node --input-type=module -e '
   process.stdout.write(url.toString());
 ')"
 export DATABASE_URL
-export DATABASE_SSL=true
+export DATABASE_SSL="${DATABASE_SSL:-false}"
 npm run db:migrate
 
 # Provision/rotate the least-privilege runtime role using the migration owner.
@@ -37,7 +37,7 @@ DATABASE_URL="$(node --input-type=module -e '
   process.stdout.write(url.toString());
 ')"
 export DATABASE_URL
-export DATABASE_SSL=true
+export DATABASE_SSL="${DATABASE_SSL:-false}"
 
 # The API process must never inherit migration-owner credentials or the role password.
 unset MIGRATOR_DATABASE_URL CYBERSANDBOX_APP_PASSWORD
