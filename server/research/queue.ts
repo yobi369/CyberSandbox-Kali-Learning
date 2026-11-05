@@ -31,7 +31,7 @@ function assertControlPlaneEnabled(): void {
   }
 }
 
-function validateQueueRequest(input: ResearchQueueRequest): void {
+export function validateResearchQueueRequest(input: ResearchQueueRequest): void {
   if (!/^[0-9a-f-]{36}$/i.test(input.experimentId) || !/^[0-9a-f-]{36}$/i.test(input.projectId)) throw new Error('Research job identifiers must be UUIDs.');
   if (!/^[a-f0-9]{40}$/i.test(input.sourceCommit)) throw new Error('Research jobs require an immutable source commit.');
   if (!/^sha256:[a-f0-9]{64}$/.test(input.environmentDigest) || !/^sha256:[a-f0-9]{64}$/.test(input.dependencyLockDigest)) throw new Error('Research environments must be pinned by SHA-256 digest.');
@@ -46,7 +46,7 @@ function validateQueueRequest(input: ResearchQueueRequest): void {
 }
 
 export async function enqueueResearchExperiment(organizationId: string, actorUserId: string, input: ResearchQueueRequest): Promise<string> {
-  validateQueueRequest(input);
+  validateResearchQueueRequest(input);
   return withInstitution(organizationId, async (client) => {
     const experiment = await client.query(
       `SELECT e.id,e.status,e.code_revision,e.environment_digest,e.dependency_lock_digest,
@@ -94,17 +94,17 @@ export function hashLeaseToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-export async function claimResearchJob(workerId: string, leaseSeconds = 120): Promise<ClaimedResearchJob | null> {
+export async function claimResearchJob(workerId: string, provider: 'research_cpu' | 'research_gpu' = 'research_cpu', leaseSeconds = 120): Promise<ClaimedResearchJob | null> {
   assertControlPlaneEnabled();
-  if (!/^[0-9a-f-]{36}$/i.test(workerId) || !Number.isInteger(leaseSeconds) || leaseSeconds < 30 || leaseSeconds > 300) throw new Error('Invalid worker ID or lease duration.');
+  if (!/^[0-9a-f-]{36}$/i.test(workerId) || !['research_cpu','research_gpu'].includes(provider) || !Number.isInteger(leaseSeconds) || leaseSeconds < 30 || leaseSeconds > 300) throw new Error('Invalid worker ID or lease duration.');
   const token = randomBytes(32).toString('base64url');
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await client.query("SELECT set_config('app.execution_control_plane','enabled',true)");
     const claimed = await client.query(
-      "SELECT * FROM claim_execution_job($1,'research_cpu',$2,$3)",
-      [workerId,hashLeaseToken(token),leaseSeconds],
+      'SELECT * FROM claim_execution_job($1,$2,$3,$4)',
+      [workerId,provider,hashLeaseToken(token),leaseSeconds],
     );
     await client.query('COMMIT');
     const row = claimed.rows[0];
