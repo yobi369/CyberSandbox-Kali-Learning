@@ -1,0 +1,73 @@
+name: cybersandbox-local
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cybersandbox
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - cybersandbox_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cybersandbox"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [backend]
+
+  bootstrap:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/cybersandbox
+      MIGRATOR_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/cybersandbox
+      CYBERSANDBOX_APP_PASSWORD: ${CYBERSANDBOX_APP_PASSWORD:?Set CYBERSANDBOX_APP_PASSWORD in .env}
+    command: ["sh", "-c", "npm run db:migrate && sh ops/postgres/apply-runtime-role.sh"]
+    networks: [backend]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: development
+      PORT: "4000"
+      MIGRATOR_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/cybersandbox
+      CYBERSANDBOX_APP_PASSWORD: ${CYBERSANDBOX_APP_PASSWORD}
+    ports:
+      - "127.0.0.1:4000:4000"
+    networks: [backend]
+
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    restart: unless-stopped
+    depends_on: [api]
+    environment:
+      CYBERSANDBOX_API_TARGET: http://api:4000
+    command: ["sh", "-c", "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0"]
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - .:/app
+      - cybersandbox_node_modules:/app/node_modules
+    networks: [backend]
+
+volumes:
+  cybersandbox_pgdata:
+  cybersandbox_node_modules:
+
+networks:
+  backend:
+    driver: bridge
