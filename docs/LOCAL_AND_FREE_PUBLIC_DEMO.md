@@ -33,7 +33,13 @@ The API and frontend ports are bound to 127.0.0.1, not exposed to your LAN or th
 
 `npm test` starts an embedded PostgreSQL 16 test server automatically when `DATABASE_URL` is not set. It applies the repository migrations, runs the full test suite, then stops the server. The server listens only on `127.0.0.1`; its initialized cluster is retained under the ignored `.local/postgres` directory for later runs. The first run downloads the platform-specific PostgreSQL binary through npm. If `DATABASE_URL` is set, tests use that database and do not start a local server or apply migrations to it.
 
-## 2. Public no-cost demonstration
+## 2. Current static simulator demo
+
+The client-facing simulator is published at https://yobi369.github.io/CyberSandbox-Kali-Learning/. It is served as a static GitHub Pages site after CI succeeds on `main`; the deployment is defined in `.github/workflows/deploy-pages.yml`.
+
+This release has no API or database. Institutional sign-in is disabled in the hosted build, simulator progress remains in each visitor's local browser storage, and the simulator does not execute commands or send network traffic. Do not use it to collect real learner records or treat locally saved progress as verified evidence. A custom domain can be connected later in the repository's GitHub Pages settings.
+
+## 3. Optional API-backed no-cost demonstration
 
 The public demo uses three isolated free-tier components:
 
@@ -79,7 +85,7 @@ Provider limits verified against official documentation on 2026-11-05:
 
 If any check fails, keep the deployment private/unshared and repair it before inviting testers. Do not upgrade to fix a free-tier limitation; pause or remove the demo instead.
 
-## 3. Security and research boundaries
+## 4. Security and research boundaries
 
 - Public access is for the learning portal and simulated workflows only.
 - Keep live lab session creation fail-closed (HTTP 503). Do not provision Kali VMs, Firecracker, KVM workers, student-code execution, or lab networks on a general-purpose free web service.

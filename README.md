@@ -68,6 +68,12 @@ npm run dev
 
 Open the local URL printed by Vite.
 
+## Public simulator demo
+
+Client link: https://yobi369.github.io/CyberSandbox-Kali-Learning/
+
+This static GitHub Pages deployment is simulator-only. It does not include the university API or database, institutional sign-in is disabled, progress stays in each visitor's browser, and no live labs or network activity are provided. Successful CI runs on `main` publish the tested build through `.github/workflows/deploy-pages.yml`. A custom domain can be connected later in the repository's Pages settings.
+
 ## Validation
 
 ```bash
@@ -81,7 +87,7 @@ The GitHub Actions workflow builds the API, applies migrations to a real Postgre
 
 ## Current release status
 
-The current branch contains an initial university application implementation, including a portal UI, server-side authentication API, PostgreSQL tenant schema, academic workflows, appeals, exports, and research metadata. These components are not yet deployed or pilot-ready. CI runs PostgreSQL integration tests, but staging acceptance with the exact restricted runtime role remains outstanding. No institution is provisioned, no API endpoint is deployed, no live Kali VM exists, and no research experiment is executed by this platform. It is not yet a university pilot release or an accredited assessment/research environment. The release gates in docs/UNIVERSITY_READINESS.md and docs/QUALITY_ASSURANCE.md must be evidenced before those claims can be made.
+The simulator-only static demo is published at the client link above. The separate university portal and API are not deployed or pilot-ready. CI runs PostgreSQL integration tests, but staging acceptance with the exact restricted runtime role remains outstanding. No institution is provisioned, no API endpoint is deployed, no live Kali VM exists, and no research experiment is executed by this platform. The public demo is not a university pilot release or an accredited assessment/research environment. The release gates in docs/UNIVERSITY_READINESS.md and docs/QUALITY_ASSURANCE.md must be evidenced before those claims can be made.
 
 ## Development sequence
 
