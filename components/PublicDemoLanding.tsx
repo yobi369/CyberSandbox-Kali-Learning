@@ -2,7 +2,7 @@ import { ArrowRight, BookOpen, Mail, ShieldCheck, TerminalSquare } from 'lucide-
 
 type PublicDemoLandingProps = {
   onStart: () => void;
-  onInstitutionSignIn: () => void;
+  onInstitutionSignIn?: () => void;
 };
 
 const contactHref = 'mailto:bmutunga794@gmail.com?subject=CyberSandbox%20demo%20inquiry';
@@ -16,9 +16,11 @@ export default function PublicDemoLanding({ onStart, onInstitutionSignIn }: Publ
             <ShieldCheck className="text-cyan-400" size={30} aria-hidden="true" />
             <span className="text-xl font-black text-white">CYBER<span className="text-cyan-400">SANDBOX</span></span>
           </a>
-          <button type="button" onClick={onInstitutionSignIn} className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-cyan-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400">
-            Institution sign in
-          </button>
+          {onInstitutionSignIn && (
+            <button type="button" onClick={onInstitutionSignIn} className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-cyan-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400">
+              Institution sign in
+            </button>
+          )}
         </div>
       </header>
 
