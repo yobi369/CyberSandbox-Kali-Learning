@@ -13,8 +13,9 @@ CyberSandbox is being developed into a structured cybersecurity education and re
 - Evidence-based lab assessments with per-lab weighted rubrics and criterion-level feedback.
 - Transparent local heuristic assessment across evidence quality, technical reasoning, confidence/limitations, and remediation quality.
 - Scenario-specific assessment rubrics and regression benchmarks for strong, weak, keyword-stuffed, overconfident, and unsafe findings.
-- Nine structured deep-dive lessons with prerequisites, concept explanations, command anatomy, worked examples, interpretation boundaries, evidence practice, common mistakes, defensive relevance, guided exercises, independent challenges, knowledge checks, and references.
+- Twelve structured lessons across three core topics, including an advanced applied lesson and multi-hour capstone for each. Capstones include fictional evidence packets, staged milestones, deliverables, measurable rubrics, and reflection prompts; the curriculum is still a draft requiring educator and institutional review.
 - Responsive simulator workspace, bounded terminal history, and browser-native text-to-speech where supported.
+- Public simulator-first landing page with no-account access, clear simulation boundaries, local-only progress disclosure, and project contact link.
 - Institution login UI and role-aware student, lecturer, and administrator dashboards.
 - PostgreSQL API for institution-scoped dashboards, course/version/module/lesson administration, prerequisite validation, cohort creation/activation, lecturer assignment, enrolment, assignment publishing, submissions, assessment and moderation.
 - Student grade appeals, immutable moderated grade history, CSV gradebook/cohort exports, research project ethics review, experiment metadata, and hash-linked research provenance.
@@ -47,6 +48,7 @@ The proposed curriculum distinguishes undergraduate BIT foundations and progress
 - [API deployment and first institution setup](docs/API_DEPLOYMENT.md) — separate API service, migrations, and controlled institution bootstrap.
 - [Authentication and institution isolation](docs/AUTHENTICATION_AND_TENANCY.md) — server-side sessions, role membership, PostgreSQL row-level security, and remaining identity gates.
 - [University readiness and adoption standard](docs/UNIVERSITY_READINESS.md) — readiness levels, safety requirements, adoption checklist, and current honest status.
+- [Institutional pilot discovery and acceptance](docs/INSTITUTIONAL_PILOT_READINESS.md) — institution intake, phased simulator/live-lab rollout, and go/no-go criteria.
 - [University curriculum map](docs/CURRICULUM_MAP.md) — proposed undergraduate and postgraduate pathways and lab content standard.
 - [Lab platform architecture](docs/LAB_PLATFORM_ARCHITECTURE.md) — target backend, tenant boundaries, isolated lab orchestration, data model, and security requirements.
 - [Instructor platform specification](docs/INSTRUCTOR_PLATFORM_SPEC.md) — roles, learner/instructor workflows, assessment governance, privacy, and accessibility.
@@ -57,10 +59,10 @@ The proposed curriculum distinguishes undergraduate BIT foundations and progress
 
 ## Run locally
 
-Requirements: Node.js 20+ and npm.
+Requirements: Node.js 22+ and npm.
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -75,11 +77,11 @@ npm run build
 npm run check
 ```
 
-The GitHub Actions workflow builds the API, applies migrations to a real PostgreSQL service, runs unit and tenant-isolation/role-enforcement integration tests, and builds the frontend. A passing CI run does not establish academic validation, accessibility conformance, VM isolation, or university readiness.
+The GitHub Actions workflow builds the API, applies migrations to a real PostgreSQL service, runs unit and tenant-isolation/role-enforcement integration tests, and builds the frontend and API container. Locally, `npm test` starts PostgreSQL 16 automatically when `DATABASE_URL` is unset, applies the migrations, runs all tests, and stops the server. Its initialized database files persist under the ignored `.local/postgres` directory, so subsequent test runs reuse the local cluster. If `DATABASE_URL` is set, tests use that database and do not start or migrate it. CI coverage is not a substitute for testing every API route with the exact production runtime role, accessibility review, VM isolation, or university readiness.
 
 ## Current release status
 
-The current branch contains an initial university application implementation, including a portal UI, server-side authentication API, PostgreSQL tenant schema, academic workflows, appeals, exports, and research metadata. These components are not yet deployed or pilot-ready. PostgreSQL integration tests are being added to CI. No institution is provisioned, no API endpoint is deployed, no live Kali VM exists, and no research experiment is executed by this platform. It is not yet a university pilot release or an accredited assessment/research environment. The release gates in docs/UNIVERSITY_READINESS.md and docs/QUALITY_ASSURANCE.md must be evidenced before those claims can be made.
+The current branch contains an initial university application implementation, including a portal UI, server-side authentication API, PostgreSQL tenant schema, academic workflows, appeals, exports, and research metadata. These components are not yet deployed or pilot-ready. CI runs PostgreSQL integration tests, but staging acceptance with the exact restricted runtime role remains outstanding. No institution is provisioned, no API endpoint is deployed, no live Kali VM exists, and no research experiment is executed by this platform. It is not yet a university pilot release or an accredited assessment/research environment. The release gates in docs/UNIVERSITY_READINESS.md and docs/QUALITY_ASSURANCE.md must be evidenced before those claims can be made.
 
 ## Development sequence
 

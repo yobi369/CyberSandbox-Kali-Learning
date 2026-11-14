@@ -133,12 +133,14 @@ const Terminal: React.FC<TerminalProps> = ({
         <span className="text-[9px] uppercase tracking-widest text-amber-400">Training data only · no host execution</span>
       </div>
       <div ref={scrollRef} className="flex-1 p-6 overflow-y-auto font-mono text-[13px] space-y-2 custom-scrollbar bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.05)_0%,transparent_100%)]">
-        {history.map((line) => (
-          <div key={line.id} className={`${line.type === 'command' ? 'text-cyan-400' : line.type === 'error' ? 'text-red-400' : line.type === 'success' ? 'text-emerald-400' : 'text-slate-400'}`}>
-            <span className="opacity-50 text-[10px] mr-2">[{new Date(line.timestamp).toLocaleTimeString([], { hour12: false })}]</span>
-            <span className="whitespace-pre-wrap">{line.content}</span>
-          </div>
-        ))}
+        <div role="log" aria-label="Simulated terminal output" aria-live="polite" aria-relevant="additions">
+          {history.map((line) => (
+            <div key={line.id} className={`${line.type === 'command' ? 'text-cyan-400' : line.type === 'error' ? 'text-red-400' : line.type === 'success' ? 'text-emerald-400' : 'text-slate-400'}`}>
+              <span className="opacity-50 text-[10px] mr-2">[{new Date(line.timestamp).toLocaleTimeString([], { hour12: false })}]</span>
+              <span className="whitespace-pre-wrap">{line.content}</span>
+            </div>
+          ))}
+        </div>
         <form onSubmit={(event) => { event.preventDefault(); handleCommand(input); setInput(''); }} className="flex items-center">
           <span className={`${isMsf ? 'text-red-500' : 'text-cyan-500'} font-bold mr-2`}>{isMsf ? 'msf6' : 'kali@cybersandbox'}:~$</span>
           <input

@@ -8,10 +8,12 @@ const Root: React.FC = () => {
   if (simulator) return (
     <>
       <button
+        type="button"
+        aria-label="Return to the CyberSandbox demo"
         onClick={() => setSimulator(false)}
         className="fixed right-4 top-4 z-[200] rounded-xl border border-cyan-400/40 bg-slate-950 px-4 py-2 text-xs font-bold text-cyan-300 shadow-xl"
       >
-        Return to university portal
+        Return to demo
       </button>
       <App />
     </>

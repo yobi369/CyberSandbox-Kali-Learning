@@ -6,9 +6,9 @@ The API is a separate Node.js service. It must not share a process or filesystem
 
 - Node.js 22+
 - PostgreSQL 15+
-- Install dependencies with `npm install` (the repository currently does not commit a lockfile).
+- Install dependencies from the committed lockfile with `npm ci`.
 - Build with `npm run api:build`.
-- Apply both versioned migrations with `npm run db:migrate` (001 core university schema; 002 academic governance, lab control-plane and research provenance).
+- Apply all versioned migrations with `npm run db:migrate` (001 university core; 002 academic governance, labs and research provenance; 003 execution control-plane contracts).
 - Start with `npm run api:start`.
 
 Required runtime configuration:

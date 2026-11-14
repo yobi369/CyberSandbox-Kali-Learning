@@ -4,12 +4,15 @@ import { createApiServer } from './app.js';
 import { pool } from './database.js';
 import { hashPassword } from './security.js';
 
-const integration = describe.skipIf(!process.env.DATABASE_URL);
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL is required for PostgreSQL integration tests. Run them with npm test.');
+}
+
 const allowedOrigin = 'https://cybersandbox-demo.pages.dev';
 let server: ReturnType<typeof createApiServer>;
 let baseUrl = '';
 
-integration('public deployment readiness', () => {
+describe('public deployment readiness', () => {
   beforeAll(async () => {
     process.env.APP_ORIGIN = allowedOrigin;
     server = createApiServer();

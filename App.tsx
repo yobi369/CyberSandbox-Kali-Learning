@@ -9,7 +9,7 @@ import { getLearningModule } from './curriculum/learningModules';
 import { Lab, UserProgress, SandboxPersistence, TerminalLine, AssessmentResult } from './types';
 import { getMentorResponse, speakInstruction } from './services/geminiService';
 import { Shield, Activity, Network, Cpu, Radar } from 'lucide-react';
-import { INITIAL_FILES } from './constants';
+import { INITIAL_FILES, LABS } from './constants';
 import { isFirstLabCompletion, matchesExpectedCommand } from './services/labProgress';
 import { MAX_TERMINAL_HISTORY_LINES, MAX_TERMINAL_LINE_LENGTH } from './services/terminalHistory';
 
@@ -111,7 +111,7 @@ const App: React.FC = () => {
   const currentRank = rankNames[Math.min(userProgress.level - 1, rankNames.length - 1)];
 
   return (
-    <div className="flex h-screen min-h-[600px] bg-[#020617] text-slate-300 font-sans overflow-hidden selection:bg-cyan-500/30">
+    <div className="flex min-h-screen bg-[#020617] text-slate-300 font-sans selection:bg-cyan-500/30 lg:h-screen lg:overflow-hidden">
       {/* ELITE HUD OVERLAY */}
       <div className="fixed inset-0 pointer-events-none z-[100] border-[1px] border-cyan-500/10 opacity-30 shadow-[inset_0_0_100px_rgba(6,182,212,0.1)]"></div>
       
@@ -122,9 +122,9 @@ const App: React.FC = () => {
               <Shield className="text-cyan-400" size={24} />
            </div>
         </div>
-        <nav className="flex-1 flex flex-col space-y-8">
-           <div aria-label="Lab workspace" className="p-3 text-cyan-500 bg-cyan-500/10 rounded-xl"><Radar size={22}/></div>
-        </nav>
+        <div aria-hidden="true" className="flex-1 p-3 text-cyan-500 bg-cyan-500/10 rounded-xl">
+          <Radar size={22} />
+        </div>
         <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20"><Activity size={20}/></div>
       </div>
 
@@ -169,7 +169,28 @@ const App: React.FC = () => {
            </div>
         </header>
 
-        <main className="flex-1 flex min-h-0 bg-[linear-gradient(rgba(6,182,212,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.02)_1px,transparent_1px)] bg-[size:40px_40px]">
+        <div className="border-b border-white/5 bg-slate-950/80 px-4 py-3 lg:hidden">
+          <label htmlFor="mobile-lab-select" className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-300">
+            Choose a simulated lab
+          </label>
+          <select
+            id="mobile-lab-select"
+            value={activeLab?.id ?? ''}
+            onChange={(event) => {
+              const lab = LABS.find((item) => item.id === event.target.value);
+              if (lab) void handleSelectLab(lab);
+            }}
+            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+          >
+            <option value="">Select a lab</option>
+            {activeLab && !LABS.some((lab) => lab.id === activeLab.id) && (
+              <option value={activeLab.id}>{activeLab.title}</option>
+            )}
+            {LABS.map((lab) => <option key={lab.id} value={lab.id}>{lab.title}</option>)}
+          </select>
+        </div>
+
+        <main className="flex-1 flex min-h-[70vh] min-w-0 bg-[linear-gradient(rgba(6,182,212,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.02)_1px,transparent_1px)] bg-[size:40px_40px] lg:min-h-0">
           <div className="hidden lg:flex w-80 shrink-0 border-r border-white/5 p-6 flex-col bg-slate-950/40 backdrop-blur-md">
              <LabBrowser 
                activeLabId={activeLab?.id || null} 

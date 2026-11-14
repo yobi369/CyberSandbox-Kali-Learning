@@ -1,4 +1,5 @@
 import type { Lab } from '../types';
+import { ADVANCED_LESSONS } from './advancedLessons';
 
 export interface WorkedExample {
   title: string;
@@ -30,6 +31,18 @@ export interface LearningModule {
   labId: Lab['id'];
   overview: string;
   learningPath: string[];
+  learningOutcomes: string[];
+  educatorReviewStatus: 'requires-institution-review';
+  capstoneProject: {
+    title: string;
+    estimatedHours: number;
+    scenario: string;
+    caseMaterials: { title: string; content: string }[];
+    milestones: { title: string; activity: string; evidence: string }[];
+    deliverables: string[];
+    rubric: { criterion: string; weight: number; standard: string }[];
+    reflectionPrompts: string[];
+  };
   lessons: LearningLesson[];
 }
 
@@ -37,6 +50,38 @@ const linux: LearningModule = {
   labId: 'linux-foundations',
   overview: 'Build a dependable mental model of a Linux command-line session. The terminal in this product is a browser simulation: commands return seeded examples and do not invoke the host shell.',
   learningPath: ['Orient yourself before acting', 'Inspect files and reason about paths', 'Understand DNS as a distributed naming system', 'Write a careful evidence note'],
+  learningOutcomes: [
+    'Explain the difference between a terminal emulator, shell, process, user identity, and operating system.',
+    'Interpret filesystem paths, metadata, Unix permissions, and DNS answers without overstating what one observation proves.',
+    'Build a bounded timeline from fictional system records and distinguish direct observations from inferences and hypotheses.',
+    'Communicate a reproducible, least-privilege defensive recommendation with explicit evidence limitations.'
+  ],
+  educatorReviewStatus: 'requires-institution-review',
+  capstoneProject: {
+    title: 'Reconstruct a fictional Linux access incident',
+    estimatedHours: 4,
+    scenario: 'A service owner reports unexpected access to a training account. You receive a fictional directory listing, permission snapshot, and a small set of sanitized authentication and service-log excerpts. Determine what the records support, what remains unknown, and which safe administrative checks should happen next.',
+    caseMaterials: [
+      { title: 'case-brief.txt', content: 'TRAINING CASE L-04\nHost label: linux-lab-01 (fictional)\nCollection window: 10:00–10:30 UTC\nQuestion: Did the supplied records establish that account analyst read /srv/reports/quarterly.txt?\nAll records below are fabricated teaching fixtures. No production host or personal account is involved.' },
+      { title: 'permissions.txt', content: 'Capture time: 10:20 UTC\n/srv                 drwxr-xr-x root root\n/srv/reports         drwxr-x--- root reviewers\n/srv/reports/quarterly.txt  -rw-r----- reporter reviewers\nACL, mount options, process credentials, supplementary groups, and earlier permission state: NOT PROVIDED' },
+      { title: 'events.log', content: '10:14:02Z auth-gateway: account=analyst result=accepted method=key\n10:14:05Z service-a: session-open account=analyst session=redacted\n10:14:06Z collector: source=host-a clock_offset=unknown\n10:18:00Z file-audit: no matching event in supplied excerpt\nAudit configuration, retention coverage, clock synchronization, and file-access telemetry status: NOT PROVIDED' }
+    ],
+    milestones: [
+      { title: 'Establish context', activity: 'Record the supplied host, account, time zone, collection window, and provenance. Identify missing context before interpreting events.', evidence: 'A context sheet that separates scenario facts from assumptions.' },
+      { title: 'Inspect files and permissions', activity: 'Explain owner/group/other permission bits for the supplied files and directories. Evaluate access paths without assuming that a filename or mode alone proves access occurred.', evidence: 'A permission table with access conditions and unanswered questions.' },
+      { title: 'Build a timeline', activity: 'Normalize the fictional log timestamps, order events, identify gaps and clock/source limitations, and distinguish authentication events from proof of a successful interactive session.', evidence: 'A sourced timeline with confidence and alternative explanations for each key claim.' },
+      { title: 'Recommend proportionate response', activity: 'Prioritize reversible containment and verification steps, name the authorized owner for each, and state what evidence should be preserved and minimized.', evidence: 'A short response plan with verification criteria and data-handling notes.' }
+    ],
+    deliverables: ['A one-page executive summary', 'A sourced event timeline and permission analysis', 'An observation/inference/hypothesis table', 'A prioritized response and verification plan', 'A limitations and privacy statement'],
+    rubric: [
+      { criterion: 'Evidence provenance and accurate interpretation', weight: 25, standard: 'Every material claim links to a supplied artifact and distinguishes direct observation from interpretation.' },
+      { criterion: 'Technical reasoning and alternative explanations', weight: 25, standard: 'Explains permissions and event semantics accurately; considers gaps, clock skew, and plausible alternatives.' },
+      { criterion: 'Safe, proportionate response', weight: 20, standard: 'Uses authorized, least-privilege checks and avoids destructive actions unsupported by evidence.' },
+      { criterion: 'Reproducibility and communication', weight: 20, standard: 'Another analyst can reconstruct the timeline and understand confidence, scope, and next steps.' },
+      { criterion: 'Privacy and evidence minimization', weight: 10, standard: 'Preserves only relevant fictional evidence and identifies sensitive data handling requirements.' }
+    ],
+    reflectionPrompts: ['Which conclusion changed most after you separated observation from inference?', 'What single additional artifact would reduce the most uncertainty, and why?', 'Which proposed response step is reversible, and what evidence would justify escalation?']
+  },
   lessons: [
     {
       id: 'linux-session-model', title: 'The shell, process, and session model', level: 'Beginner', estimatedMinutes: 20,
@@ -150,6 +195,38 @@ const recon: LearningModule = {
   labId: 'deep-recon-full-chain',
   overview: 'Learn to build a defensible asset and service inventory from authorized, scoped observations. All target data and tool output in this browser lab are seeded examples; no packets are sent.',
   learningPath: ['Define authorization and scope', 'Understand addressing, DNS, and TCP/UDP', 'Interpret scan and service fingerprints', 'Evaluate uncertainty and write a prioritized finding'],
+  learningOutcomes: [
+    'Translate written authorization into explicit assets, methods, time bounds, rate limits, exclusions, and stop conditions.',
+    'Explain how DNS, routing, TCP/UDP behavior, filtering, and vantage point affect observed service states.',
+    'Correlate fictional observations from multiple sources while tracking provenance, confidence, and contradictions.',
+    'Prioritize defensive follow-up by risk and uncertainty without equating exposure or a banner with exploitability.'
+  ],
+  educatorReviewStatus: 'requires-institution-review',
+  capstoneProject: {
+    title: 'Produce an uncertainty-aware fictional asset review',
+    estimatedHours: 5,
+    scenario: 'An institution has supplied a fictional authorization memo, two time-stamped DNS snapshots, a small seeded TCP/UDP inventory, and an asset-owner register. Several records conflict. Build a defensible inventory and propose only in-scope verification; do not contact any real system.',
+    caseMaterials: [
+      { title: 'authorization.txt', content: 'TRAINING SCOPE R-02\nOwner: Fictional Example University IT\nTargets: 192.0.2.0/28 documentation range and names listed in the attached owner register only\nWindow: 09:00–10:00 UTC\nPermitted: interpret supplied snapshots; propose owner-side verification\nNot authorized: sending packets, testing third-party hosting, exploitation, credential testing, or expanding scope\nStop contact: training-owner@example.test' },
+      { title: 'observations.csv', content: 'time_utc,source,vantage,observation\n09:00,resolver-A,training-view-1,portal.example.test A 192.0.2.20 TTL 60\n09:14,resolver-B,training-view-2,portal.example.test A 192.0.2.21 TTL 60\n09:12,inventory-scan,training-view-1,192.0.2.20 tcp/443 open banner=proxy-sample\n09:16,inventory-scan,training-view-1,192.0.2.21 no-response tcp/443' },
+      { title: 'owner-register.csv', content: 'name,owner,approved_address_mapping,notes\nportal.example.test,Student Services,NOT PROVIDED,Migration reported but change record missing\n192.0.2.20,NOT LISTED,No,May be shared edge infrastructure\n192.0.2.21,NOT LISTED,No,No ownership evidence supplied\nAll names and addresses are fictional documentation examples.' }
+    ],
+    milestones: [
+      { title: 'Convert authorization to controls', activity: 'Extract owner, exact assets, permitted passive and active methods, source, window, rate limit, exclusions, contact, and stop triggers.', evidence: 'A test-plan boundary table and a list of ambiguities requiring written approval.' },
+      { title: 'Normalize source observations', activity: 'Record source, vantage, timestamp, resolver or scan method, protocol, state, and raw wording for each supplied observation.', evidence: 'A provenance-preserving observation ledger; retain conflicting records rather than silently merging them.' },
+      { title: 'Reconcile and qualify', activity: 'Compare snapshots and inventory claims. Explain caching, filtering, stale banners, address reuse, and other plausible causes only where relevant; mark each as observed, inferred, or hypothesized.', evidence: 'A reconciled asset table with confidence, contradictions, and evidence gaps.' },
+      { title: 'Prioritize bounded follow-up', activity: 'Rank defensive review by business context, exposure evidence, confidence, and potential impact. Recommend the least intrusive authorized owner-side validation first.', evidence: 'A prioritized plan with owner, scope, method, success criterion, and stop condition.' }
+    ],
+    deliverables: ['A signed-off scope/method matrix for the fictional exercise', 'An evidence ledger with provenance and confidence', 'A reconciled inventory with unresolved conflicts', 'Three prioritized defensive follow-ups with validation criteria', 'A concise report that explicitly rules out unsupported compromise claims'],
+    rubric: [
+      { criterion: 'Scope and authorization discipline', weight: 20, standard: 'Every proposed method and target is bounded; missing authorization is treated as a blocker.' },
+      { criterion: 'Protocol and observation accuracy', weight: 25, standard: 'Correctly interprets DNS, TCP/UDP state, timestamps, vantage points, and the limits of service fingerprints.' },
+      { criterion: 'Correlation and uncertainty', weight: 25, standard: 'Preserves source provenance, identifies contradictions, and distinguishes facts from explanations.' },
+      { criterion: 'Defensive prioritization', weight: 20, standard: 'Recommendations are proportionate, assigned, testable, and based on stated risk and confidence.' },
+      { criterion: 'Report reproducibility', weight: 10, standard: 'A reviewer can trace every important conclusion to a supplied record and reproduce the reasoning.' }
+    ],
+    reflectionPrompts: ['Which contradictory records did you preserve, and what would be lost by choosing one prematurely?', 'What new evidence would change your priority ranking?', 'Where did scope constrain a technically possible next step?']
+  },
   lessons: [
     {
       id: 'recon-scope', title: 'Authorization, scope, and collection planning', level: 'Beginner', estimatedMinutes: 20,
@@ -225,6 +302,38 @@ const web: LearningModule = {
   labId: 'defensive-web-observation',
   overview: 'Learn how web requests, identity, sessions, access control, and browser security controls fit together. This lab uses fictional HTTP observations only and never contacts a website.',
   learningPath: ['Read an HTTP exchange', 'Understand authentication and session state', 'Reason about authorization and common web risks', 'Recommend and verify layered controls'],
+  learningOutcomes: [
+    'Parse HTTP request/response semantics and explain what transport security and individual headers do—and do not—protect.',
+    'Distinguish authentication, session management, authorization, and object ownership as separate controls.',
+    'Design a safe synthetic-user test matrix for role, tenant, and object boundaries using preconditions and expected results.',
+    'Propose a defense-in-depth remediation and a regression plan that verifies both positive and negative authorization cases.'
+  ],
+  educatorReviewStatus: 'requires-institution-review',
+  capstoneProject: {
+    title: 'Review a fictional multi-tenant learning portal',
+    estimatedHours: 6,
+    scenario: 'A fictional portal serves students and instructors across two institutions. You receive an architecture sketch, route inventory, sample response headers, a role table, and synthetic account/object fixtures. Review the design for authorization gaps and produce a safe verification plan without testing a real service.',
+    caseMaterials: [
+      { title: 'architecture.txt', content: 'TRAINING CASE W-03\nTwo tenants: North and South Institute\nRoles: student, lecturer, institution_admin, platform_operator\nObjects: courses, cohorts, submissions, grade exports\nDesign note: browser sends resource IDs; API authenticates a session cookie; database stores organization_id on tenant-owned records\nUnknown: route-by-route ownership checks, cohort assignment checks, export scoping, and platform support access policy' },
+      { title: 'route-contract.csv', content: 'method,path,stated-purpose\nGET,/api/submissions/:id,Read one submission\nPOST,/api/submissions/:id/assessments,Record assessment\nGET,/api/exports/gradebook.csv,Export permitted gradebook\nGET,/api/cohorts/:id,Read cohort details\nThe route list omits the detailed permission contract. Treat missing rules as questions, not confirmed defects.' },
+      { title: 'synthetic-identities.csv', content: 'identity,tenant,role,relationship\nstudent-A,North,student,owns submission S-A in cohort C-A\nstudent-B,North,student,owns submission S-B in cohort C-B\nlecturer-A,North,lecturer,assigned to C-A only\nadmin-N,North,institution_admin,administers North only\nlecturer-S,South,lecturer,assigned to C-S only\noperator-1,platform,platform_operator,service operations; learner-content policy unspecified\nAll identities, cohorts, and submissions are fabricated.' }
+    ],
+    milestones: [
+      { title: 'Model identities and assets', activity: 'List principals, tenants, roles, protected objects, sensitive actions, trust boundaries, and the owner of each policy decision.', evidence: 'A data-flow/trust-boundary diagram and an explicit set of assumptions.' },
+      { title: 'Build an authorization matrix', activity: 'Map role × tenant × object ownership × action for read, create, update, and export. Mark allowed, denied, and policy questions.', evidence: 'A complete matrix with positive and negative synthetic test cases.' },
+      { title: 'Assess evidence and controls', activity: 'Interpret the supplied HTTP examples, cookies, and headers. Separate transport/browser protections from server-side object authorization and record what the fixtures cannot prove.', evidence: 'A control-to-threat table with evidence source, limitation, and confidence.' },
+      { title: 'Design remediation and regression', activity: 'Specify server-derived tenant context, object-level checks, fail-closed behavior, audit expectations, and tests for both access and denial; include privacy-safe observability.', evidence: 'A remediation sequence and repeatable synthetic acceptance plan.' }
+    ],
+    deliverables: ['A data-flow and trust-boundary diagram', 'A role/tenant/object/action authorization matrix', 'A prioritized finding with exact fictional evidence and limitations', 'A defensive design and regression-test plan', 'A privacy-aware audit and rollout checklist'],
+    rubric: [
+      { criterion: 'Threat model and trust boundaries', weight: 20, standard: 'Identifies principals, assets, boundaries, and attacker-controlled inputs without confusing authentication with authorization.' },
+      { criterion: 'Authorization coverage', weight: 25, standard: 'Matrix covers roles, tenants, ownership, and operations with meaningful allow/deny cases.' },
+      { criterion: 'Technical accuracy and evidence', weight: 20, standard: 'Interprets HTTP and session controls accurately and distinguishes fixture evidence from verified behavior.' },
+      { criterion: 'Remediation and regression quality', weight: 25, standard: 'Designs server-side, deny-by-default controls and repeatable positive and negative synthetic tests.' },
+      { criterion: 'Privacy and communication', weight: 10, standard: 'Uses synthetic data, avoids secrets, and communicates severity, uncertainty, and ownership clearly.' }
+    ],
+    reflectionPrompts: ['Which authorization decision must be made server-side even if the UI hides the action?', 'Which negative test would catch a cross-tenant regression most directly?', 'How could audit evidence prove a denial occurred without collecting unnecessary learner data?']
+  },
   lessons: [
     {
       id: 'web-http', title: 'HTTP requests, responses, and security headers', level: 'Beginner', estimatedMinutes: 25,
@@ -286,6 +395,10 @@ const web: LearningModule = {
   ]
 };
 
+linux.lessons.push(ADVANCED_LESSONS['linux-foundations']);
+recon.lessons.push(ADVANCED_LESSONS['deep-recon-full-chain']);
+web.lessons.push(ADVANCED_LESSONS['defensive-web-observation']);
+
 export const LEARNING_MODULES: LearningModule[] = [linux, recon, web];
 
 export function getLearningModule(labId: string): LearningModule | undefined {
@@ -297,11 +410,16 @@ export function validateLearningModule(module: LearningModule): string[] {
   if (!module.overview.trim()) errors.push('overview');
   if (module.learningPath.length < 3) errors.push('learningPath');
   if (module.lessons.length < 3) errors.push('lessons');
+  if (module.learningOutcomes.length < 4) errors.push('learningOutcomes');
+  if (module.educatorReviewStatus !== 'requires-institution-review') errors.push('educatorReviewStatus');
+  if (module.capstoneProject.estimatedHours < 3 || module.capstoneProject.milestones.length < 4 || module.capstoneProject.deliverables.length < 4) errors.push('capstoneProject: scope');
+  const rubricWeight = module.capstoneProject.rubric.reduce((sum, criterion) => sum + criterion.weight, 0);
+  if (module.capstoneProject.rubric.length < 4 || rubricWeight !== 100) errors.push('capstoneProject: rubric must total 100');
   const lessonIds = new Set<string>();
   for (const lesson of module.lessons) {
     if (lessonIds.has(lesson.id)) errors.push(`duplicate lesson id: ${lesson.id}`);
     lessonIds.add(lesson.id);
-    if (!lesson.title.trim() || lesson.prerequisites.length === 0 || lesson.concepts.length < 3) errors.push(`${lesson.id}: prerequisites/concepts`);
+    if (!lesson.title.trim() || lesson.estimatedMinutes < 20 || lesson.prerequisites.length === 0 || lesson.concepts.length < 4) errors.push(`${lesson.id}: prerequisites/concepts/depth`);
     if (lesson.commandAnatomy.length === 0 || lesson.workedExample.interpretation.length < 2 || lesson.workedExample.notEstablished.length < 2) errors.push(`${lesson.id}: command/example interpretation`);
     if (lesson.evidencePractice.length === 0 || lesson.commonMistakes.length < 2 || lesson.defensiveRelevance.length < 2) errors.push(`${lesson.id}: evidence/troubleshooting/defensive relevance`);
     if (lesson.guidedPractice.length < 2 || lesson.independentChallenge.deliverables.length < 2 || lesson.knowledgeCheck.length < 2 || lesson.references.length < 2) errors.push(`${lesson.id}: practice/challenge/checks/references`);
@@ -309,5 +427,9 @@ export function validateLearningModule(module: LearningModule): string[] {
       if (!/^https:\/\//.test(reference.url)) errors.push(`${lesson.id}: invalid reference URL`);
     }
   }
+  for (const milestone of module.capstoneProject.milestones) {
+    if (!milestone.title.trim() || milestone.activity.length < 40 || milestone.evidence.length < 20) errors.push(`capstoneProject: incomplete milestone ${milestone.title}`);
+  }
+  if (module.capstoneProject.caseMaterials.length < 3 || module.capstoneProject.caseMaterials.some((item) => item.content.length < 100)) errors.push('capstoneProject: missing substantive case materials');
   return errors;
 }

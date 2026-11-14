@@ -57,7 +57,7 @@ services:
     depends_on: [api]
     environment:
       CYBERSANDBOX_API_TARGET: http://api:4000
-    command: ["sh", "-c", "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0"]
+    command: ["sh", "-c", "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0"]
     ports:
       - "127.0.0.1:3000:3000"
     volumes:

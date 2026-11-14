@@ -3,9 +3,9 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 
 const databaseUrl = process.env.DATABASE_URL;
-const integration = describe.skipIf(!databaseUrl);
+if (!databaseUrl) throw new Error('DATABASE_URL is required for PostgreSQL integration tests. Run them with npm test.');
 
-integration('PostgreSQL institution row-level security', () => {
+describe('PostgreSQL institution row-level security', () => {
   const admin = new Pool({ connectionString: databaseUrl, max: 2 });
 
   afterAll(async () => { await admin.end(); });

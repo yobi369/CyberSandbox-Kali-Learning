@@ -9,7 +9,11 @@ describe('deep learning curriculum', () => {
       'linux-foundations'
     ]);
     for (const module of LEARNING_MODULES) {
-      expect(module.lessons.length).toBeGreaterThanOrEqual(3);
+      expect(module.lessons.length).toBeGreaterThanOrEqual(4);
+      expect(module.capstoneProject.estimatedHours).toBeGreaterThanOrEqual(4);
+      expect(module.capstoneProject.caseMaterials).toHaveLength(3);
+      expect(module.capstoneProject.caseMaterials.every((material) => material.content.length >= 100)).toBe(true);
+      expect(module.capstoneProject.rubric.reduce((sum, criterion) => sum + criterion.weight, 0)).toBe(100);
       expect(validateLearningModule(module)).toEqual([]);
     }
   });
@@ -46,7 +50,17 @@ describe('deep learning curriculum', () => {
   });
 
   it('resolves modules by the existing lab identifier', () => {
-    expect(getLearningModule('linux-foundations')?.lessons).toHaveLength(3);
+    expect(getLearningModule('linux-foundations')?.lessons).toHaveLength(4);
     expect(getLearningModule('not-a-real-lab')).toBeUndefined();
+  });
+
+  it('adds an advanced applied lesson and substantive capstone to each core topic', () => {
+    for (const module of LEARNING_MODULES) {
+      expect(module.lessons.some((lesson) => lesson.level === 'Advanced' && lesson.estimatedMinutes >= 60)).toBe(true);
+      expect(module.capstoneProject.milestones).toHaveLength(4);
+      expect(module.capstoneProject.deliverables.length).toBeGreaterThanOrEqual(5);
+      expect(module.capstoneProject.reflectionPrompts.length).toBeGreaterThanOrEqual(3);
+      expect(module.educatorReviewStatus).toBe('requires-institution-review');
+    }
   });
 });

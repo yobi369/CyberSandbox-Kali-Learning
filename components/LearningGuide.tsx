@@ -30,8 +30,17 @@ const LearningGuide: React.FC<LearningGuideProps> = ({ module }) => {
           <h3 className="mt-1 text-lg font-black text-white">Deep-dive field guide</h3>
           <p className="mt-2 max-w-3xl text-xs leading-6 text-slate-400">{module.overview}</p>
         </div>
-        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-amber-300">Seeded simulation · no live execution</span>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-amber-300">Seeded simulation · no live execution</span>
+          <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-violet-200">Instructor review required</span>
+        </div>
       </div>
+
+      <Section title="Module learning outcomes">
+        <ul className="grid gap-2 md:grid-cols-2">
+          {module.learningOutcomes.map((outcome) => <li key={outcome} className="rounded-lg border border-white/5 bg-slate-900/60 p-3 text-xs leading-5 text-slate-300">{outcome}</li>)}
+        </ul>
+      </Section>
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {module.learningPath.map((step, index) => (
@@ -133,6 +142,42 @@ const LearningGuide: React.FC<LearningGuideProps> = ({ module }) => {
           <Section title="Authoritative further study">
             <ul className="space-y-2">{lesson.references.map((item) => <li key={item.url}><a href={item.url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-cyan-300 underline decoration-cyan-500/30 underline-offset-4 hover:text-cyan-200">{item.label} ↗</a></li>)}</ul>
             <p className="text-[10px] leading-5 text-slate-500">References are external study material. Their inclusion does not imply that the simulator queried or validated any live target.</p>
+          </Section>
+
+          <Section title={`Applied capstone · ${module.capstoneProject.title}`}>
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+              <p className="text-[10px] font-black uppercase tracking-wider text-emerald-300">{module.capstoneProject.estimatedHours}-hour project · fictional evidence only</p>
+              <p className="mt-2 text-xs leading-6 text-slate-200">{module.capstoneProject.scenario}</p>
+            </div>
+            <div className="space-y-2">
+              <h5 className="text-[10px] font-black uppercase tracking-wider text-cyan-300">Case packet · supplied fictional evidence</h5>
+              {module.capstoneProject.caseMaterials.map((material) => <details key={material.title} className="rounded-lg border border-white/5 bg-slate-900/60 p-3">
+                <summary className="cursor-pointer text-xs font-bold text-white">{material.title}</summary>
+                <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-lg bg-black/40 p-3 text-xs leading-5 text-slate-300">{material.content}</pre>
+              </details>)}
+            </div>
+            <div className="space-y-2">
+              {module.capstoneProject.milestones.map((milestone, index) => <div key={milestone.title} className="rounded-lg border border-white/5 bg-slate-900/60 p-3">
+                <h5 className="text-xs font-bold text-white">Milestone {index + 1}: {milestone.title}</h5>
+                <p className="mt-2 text-xs leading-5 text-slate-300">{milestone.activity}</p>
+                <p className="mt-2 text-xs leading-5 text-emerald-200"><strong>Evidence to produce: </strong>{milestone.evidence}</p>
+              </div>)}
+            </div>
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="rounded-lg border border-white/5 bg-slate-900/60 p-3">
+                <h5 className="text-[10px] font-black uppercase tracking-wider text-cyan-300">Submission package</h5>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-300">{module.capstoneProject.deliverables.map((item) => <li key={item}>{item}</li>)}</ul>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-slate-900/60 p-3">
+                <h5 className="text-[10px] font-black uppercase tracking-wider text-cyan-300">Assessment rubric · 100 points</h5>
+                <ul className="mt-2 space-y-2 text-xs leading-5 text-slate-300">{module.capstoneProject.rubric.map((criterion) => <li key={criterion.criterion}><strong className="text-white">{criterion.weight}% · {criterion.criterion}: </strong>{criterion.standard}</li>)}</ul>
+              </div>
+            </div>
+            <div className="rounded-lg border border-white/5 bg-slate-900/60 p-3">
+              <h5 className="text-[10px] font-black uppercase tracking-wider text-cyan-300">Reflection after review</h5>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-300">{module.capstoneProject.reflectionPrompts.map((prompt) => <li key={prompt}>{prompt}</li>)}</ul>
+            </div>
+            <p className="text-[10px] leading-5 text-amber-200/80">This capstone is a course-design draft, not an institution-approved assessment. An educator should adapt the dataset, expected evidence, accessibility options, and marking guidance before assigning it.</p>
           </Section>
         </article>
       </div>

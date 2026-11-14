@@ -34,7 +34,7 @@ const Mentor: React.FC<MentorProps> = ({ message, isTyping, currentStep, stepPro
           </div>
           <div>
             <h3 className="text-[11px] font-black text-white uppercase tracking-widest">CyberSandbox Mentor</h3>
-            <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-tighter">Tactical Advisor</span>
+            <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-tighter">Guided practice</span>
           </div>
         </div>
         <div className="flex space-x-1 p-1 bg-slate-950 rounded-lg border border-white/5">
@@ -73,7 +73,7 @@ const Mentor: React.FC<MentorProps> = ({ message, isTyping, currentStep, stepPro
           <div className="space-y-4 text-[12px] text-slate-400">
              <div className="flex items-center space-x-2 text-cyan-400 mb-2">
                 <Book size={14}/>
-                <h4 className="font-black uppercase tracking-widest">Tactical Intelligence</h4>
+                <h4 className="font-black uppercase tracking-widest">Lesson notes</h4>
              </div>
              <p className="leading-relaxed bg-slate-950/50 p-4 rounded-xl border border-white/5">
                 {currentStep?.detailedGuide || "Perform reconnaissance to unlock deep tool analysis."}

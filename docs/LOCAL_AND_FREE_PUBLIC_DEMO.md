@@ -29,6 +29,10 @@ Useful commands:
 
 The API and frontend ports are bound to 127.0.0.1, not exposed to your LAN or the public internet. Do not change that binding for a public demo.
 
+### PostgreSQL-backed tests without Docker
+
+`npm test` starts an embedded PostgreSQL 16 test server automatically when `DATABASE_URL` is not set. It applies the repository migrations, runs the full test suite, then stops the server. The server listens only on `127.0.0.1`; its initialized cluster is retained under the ignored `.local/postgres` directory for later runs. The first run downloads the platform-specific PostgreSQL binary through npm. If `DATABASE_URL` is set, tests use that database and do not start a local server or apply migrations to it.
+
 ## 2. Public no-cost demonstration
 
 The public demo uses three isolated free-tier components:
